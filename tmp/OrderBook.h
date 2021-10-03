@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #ifndef ORDER_BOOK_H
 #define ORDER_BOOK_H
@@ -80,25 +80,25 @@ public:
 	>;
 	
 	/**
-	 * \brief Постановка заявок
-	 * \return id заявки
+	 * \brief РџРѕСЃС‚Р°РЅРѕРІРєР° Р·Р°СЏРІРѕРє
+	 * \return id Р·Р°СЏРІРєРё
 	 */
 	order_id_t place(std::unique_ptr<Order>);
 	/**
-	 * \brief Отмена заявки
-	 * \return Данные отменённой заявки. Если такой заявки не было, то boost::none.
+	 * \brief РћС‚РјРµРЅР° Р·Р°СЏРІРєРё
+	 * \return Р”Р°РЅРЅС‹Рµ РѕС‚РјРµРЅС‘РЅРЅРѕР№ Р·Р°СЏРІРєРё. Р•СЃР»Рё С‚Р°РєРѕР№ Р·Р°СЏРІРєРё РЅРµ Р±С‹Р»Рѕ, С‚Рѕ boost::none.
 	 */
 	boost::optional<OrderData> cancel(order_id_t);
 	/**
-	 * \brief Получение данных заявки
-	 * \return Данные заявки
+	 * \brief РџРѕР»СѓС‡РµРЅРёРµ РґР°РЅРЅС‹С… Р·Р°СЏРІРєРё
+	 * \return Р”Р°РЅРЅС‹Рµ Р·Р°СЏРІРєРё
 	 */
 	OrderData const& get_data(order_id_t);
 	std::unique_ptr<MarketDataSnapshot> get_snapshot();
 
 private:
 	/**
-	 * \brief Сведение заявок
+	 * \brief РЎРІРµРґРµРЅРёРµ Р·Р°СЏРІРѕРє
 	 */
 	 // TODO: merge in another thread?
 	void _merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock);
