@@ -11,7 +11,6 @@ find_package(
 	Boost 1.64 REQUIRED 
 	COMPONENTS unit_test_framework filesystem system date_time chrono thread locale iostreams
 )
-find_library(pthread REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${Boost_INCLUDE_DIRS})
 target_link_directories(${PROJECT_NAME} PRIVATE  ${Boost_LIBRARY_DIR_DEBUG})
@@ -33,7 +32,12 @@ set_target_properties(OrderBookLib
 )
 
 
-target_link_libraries(${PROJECT_NAME} OrderBookLib boost_unit_test_framework boost_system boost_filesystem boost_chrono boost_thread boost_locale boost_date_time boost_timer boost_iostreams pthread)
+target_link_libraries(${PROJECT_NAME} OrderBookLib boost_unit_test_framework boost_system boost_filesystem boost_chrono boost_thread boost_locale boost_date_time boost_timer boost_iostreams)
+if(UNIX)
+	find_library(pthread REQUIRED)
+	target_link_libraries(${PROJECT_NAME} pthread)
+endif()
+
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE NOMINMAX)
 
