@@ -5,9 +5,10 @@
 
 order_id_t OrderBook::place(std::unique_ptr<Order> order)
 {
-	boost::upgrade_lock<boost::shared_mutex> read_lock(_mutex);
-
-	auto order_id = _id_counter->operator++();
+	// Приоритет при мёрже у заявки с наименьшим id.
+	// Простенькая реализация для удовлетворения этой цели через врайт лок всего этапа мёржа и добавления в стакан.
+	boost::unique_lock<boost::shared_mutex> write_lock(_mutex);
+	auto order_id = ++_id_counter;
 	
 	auto &orders_by_id = _orders.get<OrdersById>();
 	auto const element_iter = orders_by_id.find(order_id);
@@ -15,8 +16,7 @@ order_id_t OrderBook::place(std::unique_ptr<Order> order)
 
 	{
 		OrderData order_data(order_id, std::move(order));
-		_merge(order_data, read_lock);
-		boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(read_lock);
+		_merge(order_data);
 		if (order_data.order->quantity)
 			auto emplacement_result = _orders.emplace_hint(element_iter, std::move(order_data));
 	}
@@ -35,7 +35,6 @@ boost::optional<OrderData> OrderBook::cancel(order_id_t id)
 	if(order_iter != orders_by_id.end())
 	{
 		boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(read_lock);
-		
 		ret_val = std::move(order_iter.get_node()->value());
 		orders_by_id.erase(order_iter);
 	}
@@ -56,12 +55,12 @@ OrderData const& OrderBook::get_data(order_id_t id)
 	return *order_iter;
 }
 
-bool OrderBook::_is_order_satisfied(OrderData const& order) const
+bool OrderBook::_is_order_satisfied(OrderData const& order)
 {
 	return order.order->quantity == 0;
 }
 
-void OrderBook::_merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock)
+void OrderBook::_merge(OrderData &new_order)
 {
 	auto& orders_by_price_and_type = _orders.get<OrdersByPriceAndType>();
 	// Мержить можем если пришедшая заявка - ask, тогда будем мёржить bid-ы, и наоборот.
@@ -82,7 +81,6 @@ void OrderBook::_merge(OrderData &new_order, boost::upgrade_lock<boost::shared_m
 			// .. сливать больше нечего.
 			break;
 
-		boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(orders_read_lock);
 		// Первой сливается заявка, которая была зарегистрирована раньше других.
 		// При этом, если слияние займёт больше 1-й итерации, то учтём, что мы можем встретить уже удовлетворённые заявки.
 		// Уже удовлетворённые не удаляем сразу, а удалим после мёржа, так эффективнее.
@@ -113,7 +111,6 @@ void OrderBook::_merge(OrderData &new_order, boost::upgrade_lock<boost::shared_m
 	
 	// .. удалим их.
 	auto& orders_by_id = _orders.get<OrdersById>();
-	boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(orders_read_lock);
 	for(auto satisfied_order_id : satisfied_orders) 
 		orders_by_id.erase(satisfied_order_id);
 }

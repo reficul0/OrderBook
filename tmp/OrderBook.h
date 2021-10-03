@@ -100,15 +100,16 @@ private:
 	/**
 	 * \brief Удавлетворена ли заявка
 	 */
-	bool _is_order_satisfied(OrderData const &order) const;
+	static bool _is_order_satisfied(OrderData const &order);
 	/**
 	 * \brief Сведение заявок
 	 */
 	 // TODO: merge in another thread?
-	void _merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock);
+	void _merge(OrderData &new_order);
 
 	boost::shared_mutex mutable _mutex;
-	boost::synchronized_value<order_id_t> _id_counter = 0;
+	// изменять только в контексте write lock-a мьютекса.
+	order_id_t _id_counter = 0;
 	orders_t _orders{};
 };
 
