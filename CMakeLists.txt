@@ -16,5 +16,7 @@ endif()
 
 set(CMAKE_CONFIGURATION_TYPES ${CMAKE_BUILD_TYPE})
 
+set(CMAKE_STATIC_LIBRARY_PREFIX "")
+
 add_subdirectory(tmp)
 add_subdirectory(UnitTests)

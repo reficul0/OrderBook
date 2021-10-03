@@ -7,7 +7,7 @@ order_id_t OrderBook::place(std::unique_ptr<Order> order)
 {
 	boost::upgrade_lock<boost::shared_mutex> read_lock(_mutex);
 	
-	// todo: генерировать id, которого точно нет в контейнере
+	// todo: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ id, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 	auto order_id = _orders.size();
 
 	OrderData order_data(order_id, std::move(order));
@@ -52,7 +52,7 @@ OrderData const& OrderBook::get_data(order_id_t id)
 	auto& orders_by_id = _orders.get<OrdersById>();
 	auto const order_iter = orders_by_id.find(id);
 	if (order_iter == orders_by_id.end())
-		throw std::exception("There is no order with same id");
+		throw std::logic_error("There is no order with same id");
 	
 	return *order_iter;
 }
@@ -60,14 +60,14 @@ OrderData const& OrderBook::get_data(order_id_t id)
 void OrderBook::_merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock)
 {
 	auto& orders_by_price = _orders.get<OrdersByPriceAndType>();
-	// под inverted подразумевается был inverted(ask) == bid и наоборот
+	// пїЅпїЅпїЅ inverted пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ inverted(ask) == bid пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 	auto const inverted_type = (uint8_t)!new_order.GetType();
 
-	// todo: сделать бы поменьше поисков, да и пооптимальнее вобщем
+	// todo: пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 	while (true) 
 	{
 		auto const inverted_type_orders_iters_pair = orders_by_price.equal_range(boost::make_tuple(new_order.GetPrice(), inverted_type));
-		// пока есть что мёржить
+		// пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 		if (inverted_type_orders_iters_pair.first == inverted_type_orders_iters_pair.second
 			|| new_order.order->quantity == 0)
 			break;
