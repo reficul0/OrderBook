@@ -101,9 +101,10 @@ private:
 	 * \brief Сведение заявок
 	 */
 	 // TODO: merge in another thread?
-	void _merge(OrderData &new_order, boost::unique_lock_ptr<orders_t, boost::shared_mutex> &locked_orders, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock);
+	void _merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock);
 
-	boost::synchronized_value<orders_t, boost::shared_mutex> _orders{};
+	boost::shared_mutex mutable _mutex;
+	orders_t _orders{};
 };
 
 #endif
