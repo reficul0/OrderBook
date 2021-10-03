@@ -9,7 +9,7 @@ struct MarketDataSnapshot
 {
 	explicit MarketDataSnapshot(OrderBook::orders_t const &src_orders)
 	{
-		// todo: ускорить
+		// TODO: ≈сли будет критичным, то ускорить.
 		auto& orders_by_type = src_orders.get<OrdersByType>();
 		for (uint8_t order_type = 0; order_type < (uint8_t)OrderType::_EnumElementsCount; ++order_type)
 		{
@@ -32,8 +32,6 @@ struct MarketDataSnapshot
 	>;
 
 	std::array<sorted_by_price_orders_t, (size_t)OrderType::_EnumElementsCount> orders;
-
-	// todo: void to_json();
 private:
 	template<typename IterT>
 	void _copy(sorted_by_price_orders_t &dst, IterT src_begin, IterT src_end)

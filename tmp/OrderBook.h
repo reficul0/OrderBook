@@ -104,7 +104,6 @@ private:
 	/**
 	 * \brief Сведение заявок
 	 */
-	 // TODO: merge in another thread?
 	void _merge(OrderData &new_order);
 
 	boost::shared_mutex mutable _mutex;
