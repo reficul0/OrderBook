@@ -15,7 +15,7 @@ struct OrderData
 	{}
 	OrderData(OrderData &&other) noexcept
 		: order_id(other.order_id)
-		  , order(std::move(other.order))
+		, order(std::move(other.order))
 	{
 	}
 	OrderData& operator=(OrderData && other)
@@ -98,12 +98,17 @@ public:
 
 private:
 	/**
+	 * \brief Удавлетворена ли заявка
+	 */
+	bool _is_order_satisfied(OrderData const &order) const;
+	/**
 	 * \brief Сведение заявок
 	 */
 	 // TODO: merge in another thread?
 	void _merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock);
 
 	boost::shared_mutex mutable _mutex;
+	boost::synchronized_value<order_id_t> _id_counter = 0;
 	orders_t _orders{};
 };
 

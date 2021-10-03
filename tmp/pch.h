@@ -42,4 +42,6 @@
 #include <boost/thread/synchronized_value.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
+#include <boost/multiprecision/cpp_int.hpp>
+
 #endif //PCH_H

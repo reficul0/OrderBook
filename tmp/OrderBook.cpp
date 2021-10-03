@@ -7,15 +7,14 @@ order_id_t OrderBook::place(std::unique_ptr<Order> order)
 {
 	boost::upgrade_lock<boost::shared_mutex> read_lock(_mutex);
 
-	// todo: генерировать id, которого точно нет в контейнере
-	auto order_id = _orders.size();
-
-	OrderData order_data(order_id, std::move(order));
+	auto order_id = _id_counter->operator++();
+	
 	auto &orders_by_id = _orders.get<OrdersById>();
-	auto const element_iter = orders_by_id.find(order_data.order_id);
+	auto const element_iter = orders_by_id.find(order_id);
 	assert(element_iter == orders_by_id.end());
 
 	{
+		OrderData order_data(order_id, std::move(order));
 		_merge(order_data, read_lock);
 		boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(read_lock);
 		if (order_data.order->quantity)
@@ -57,44 +56,66 @@ OrderData const& OrderBook::get_data(order_id_t id)
 	return *order_iter;
 }
 
+bool OrderBook::_is_order_satisfied(OrderData const& order) const
+{
+	return order.order->quantity == 0;
+}
+
 void OrderBook::_merge(OrderData &new_order, boost::upgrade_lock<boost::shared_mutex> &orders_read_lock)
 {
-	auto& orders_by_price = _orders.get<OrdersByPriceAndType>();
-	// под inverted подразумевается был inverted(ask) == bid и наоборот
-	auto const inverted_type = (uint8_t)!new_order.GetType();
+	auto& orders_by_price_and_type = _orders.get<OrdersByPriceAndType>();
+	// Мержить можем если пришедшая заявка - ask, тогда будем мёржить bid-ы, и наоборот.
+	auto const order_type_that_can_be_merged = (uint8_t)!new_order.GetType();
+	auto const key_of_merging_orders =  boost::make_tuple(new_order.GetPrice(), order_type_that_can_be_merged);
 
-	// todo: сделать бы поменьше поисков, да и пооптимальнее вобщем
+	// Сначала получим все зявки, которые можно слить с новой заявкой ..
+	auto orders_for_merge_iters_pair = orders_by_price_and_type.equal_range(key_of_merging_orders);
+	// .. если таких нет ..
+	if(orders_for_merge_iters_pair.first == orders_for_merge_iters_pair.second)
+		// .. сливать больше нечего.
+		return;
+	
+	std::list<order_id_t> satisfied_orders;
 	while (true) 
 	{
-		auto const inverted_type_orders_iters_pair = orders_by_price.equal_range(boost::make_tuple(new_order.GetPrice(), inverted_type));
-		// пока есть что мёржить
-		if (inverted_type_orders_iters_pair.first == inverted_type_orders_iters_pair.second
-			|| new_order.order->quantity == 0)
+		if(_is_order_satisfied(new_order))
+			// .. сливать больше нечего.
 			break;
-		
-		auto inverted_order_with_smallest_id = std::min_element(
-			inverted_type_orders_iters_pair.first,
-			inverted_type_orders_iters_pair.second,
-			[](decltype(*inverted_type_orders_iters_pair.first) lhs, decltype(*inverted_type_orders_iters_pair.first) rhs)
+
+		boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(orders_read_lock);
+		// Первой сливается заявка, которая была зарегистрирована раньше других.
+		// При этом, если слияние займёт больше 1-й итерации, то учтём, что мы можем встретить уже удовлетворённые заявки.
+		// Уже удовлетворённые не удаляем сразу, а удалим после мёржа, так эффективнее.
+		auto merging_order_with_top_prioroty = std::min_element(
+			orders_for_merge_iters_pair.first,
+			orders_for_merge_iters_pair.second,
+			[](decltype(*orders_for_merge_iters_pair.first) lhs, decltype(*orders_for_merge_iters_pair.first) rhs)
 			{
-				return lhs.order_id < rhs.order_id;
+				return lhs.order_id < rhs.order_id && lhs.order->quantity;
 			}
 		);
-		if(inverted_order_with_smallest_id != inverted_type_orders_iters_pair.second)
+		// Если заявка для слияния найдена ..
+		if(merging_order_with_top_prioroty != orders_for_merge_iters_pair.second && merging_order_with_top_prioroty->order->quantity)
 		{
-			auto const quantity = (std::min)(new_order.order->quantity, inverted_order_with_smallest_id->order->quantity);
+			// .. сливаем её.
+			auto const quantity = (std::min)(new_order.order->quantity, merging_order_with_top_prioroty->order->quantity);
 			new_order.order->quantity -= quantity;
-			inverted_order_with_smallest_id->order->quantity -= quantity;
-
-			if (inverted_order_with_smallest_id->order->quantity == 0)
-			{
-				boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(orders_read_lock);
-				orders_by_price.erase(inverted_order_with_smallest_id);
-			}
-			else // new_order.order->quantity == 0
-				break;
+			merging_order_with_top_prioroty->order->quantity -= quantity;
+			
+			if (_is_order_satisfied(*merging_order_with_top_prioroty))
+				satisfied_orders.emplace_back(merging_order_with_top_prioroty->order_id);
 		}
 	}
+
+	// Если есть удовлетворённые заявки ..
+	if (satisfied_orders.empty())
+		return;
+	
+	// .. удалим их.
+	auto& orders_by_id = _orders.get<OrdersById>();
+	boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(orders_read_lock);
+	for(auto satisfied_order_id : satisfied_orders) 
+		orders_by_id.erase(satisfied_order_id);
 }
 
 std::unique_ptr<MarketDataSnapshot> OrderBook::get_snapshot()
@@ -102,3 +123,4 @@ std::unique_ptr<MarketDataSnapshot> OrderBook::get_snapshot()
 	boost::shared_lock<boost::shared_mutex> read_lock(_mutex);
 	return std::make_unique<MarketDataSnapshot>(_orders);
 }
+

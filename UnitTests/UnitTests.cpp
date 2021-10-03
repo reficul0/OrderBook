@@ -44,8 +44,10 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest)
 {
 	OrderBook book;
 
-	auto const ask_order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, 300));
-	book.place(std::make_unique<Order>(OrderType::Bid, 4, 299));
+	auto constexpr summary_quantity = 300;
+	
+	auto const ask_order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, summary_quantity));
+	book.place(std::make_unique<Order>(OrderType::Bid, 4, summary_quantity - 1));
 	
 	{
 		auto const &snapshot = book.get_snapshot();
@@ -76,6 +78,48 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest)
 
 		auto &bids = snapshot->orders[(uint8_t)OrderType::Bid];
 		// все биды удовлетворены
+		BOOST_TEST(bids.empty());
+	}
+}
+
+BOOST_AUTO_TEST_CASE(TopPriorityOrderMergeTest)
+{
+	OrderBook book;
+
+	auto constexpr summary_quantity = 300;
+	auto constexpr second_order_quantity = 1;
+	auto constexpr top_priority_order_quantity = summary_quantity - second_order_quantity;
+	
+	auto const top_priority_order_id = book.place(std::make_unique<Order>(OrderType::Bid, 4, top_priority_order_quantity));
+	auto const less_priority_order_id = book.place(std::make_unique<Order>(OrderType::Bid, 4, second_order_quantity));
+	
+	book.place(std::make_unique<Order>(OrderType::Ask, 4, top_priority_order_quantity));
+	// Должна быть слита самая приоритетная заявка ..
+	BOOST_CHECK_THROW(book.get_data(top_priority_order_id), std::exception);
+	// .. а менее приоритетная не должна.
+	BOOST_CHECK_NO_THROW(book.get_data(less_priority_order_id));
+}
+
+BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest)
+{
+	OrderBook book;
+
+	auto constexpr summary_quantity = 300;
+	auto constexpr second_order_quantity = 1;
+	
+	book.place(std::make_unique<Order>(OrderType::Bid, 4, summary_quantity - second_order_quantity));
+	book.place(std::make_unique<Order>(OrderType::Bid, 4, second_order_quantity));
+	auto order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, summary_quantity));
+
+	{
+		auto const &snapshot = book.get_snapshot();
+
+		auto &ascks = snapshot->orders[(uint8_t)OrderType::Ask];
+		// помещённый ask удовлетворён полностью
+		BOOST_TEST(ascks.empty());
+
+		auto &bids = snapshot->orders[(uint8_t)OrderType::Bid];
+		// биды тоже все удовлетворены
 		BOOST_TEST(bids.empty());
 	}
 }

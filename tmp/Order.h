@@ -5,7 +5,7 @@
 
 #include <cinttypes>
 
-using order_id_t = size_t;
+using order_id_t = boost::multiprecision::uint256_t;
 using price_t = double;
 
 enum class OrderType : uint8_t
