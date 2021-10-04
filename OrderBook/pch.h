@@ -44,6 +44,8 @@
 
 #include <boost/multiprecision/cpp_int.hpp>
 
+#include <boost/thread/future.hpp>
+
 #include "async_tasks_executor.h"
 
 #endif //PCH_H

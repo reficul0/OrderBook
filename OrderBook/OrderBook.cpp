@@ -1,9 +1,6 @@
 ﻿#include "pch.h"
 
 #include "OrderBook.h"
-
-#include <boost/thread/future.hpp>
-
 #include "MarketDataSnapshot.h"
 
 order_id_t OrderBook::place(std::unique_ptr<Order> order)
