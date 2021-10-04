@@ -7,7 +7,7 @@
 
 struct MarketDataSnapshot
 {
-	explicit MarketDataSnapshot(OrderBook::orders_t const &src_orders)
+	explicit MarketDataSnapshot(OrderBook::orders_book_t const &src_orders)
 	{
 		// TODO: Если будет критичным, то ускорить.
 		auto& orders_by_type = src_orders.get<OrdersByType>();

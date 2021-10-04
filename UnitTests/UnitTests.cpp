@@ -6,6 +6,8 @@
 #include "OrderBook.h"
 #include "MarketDataSnapshot.h"
 
+// TODO: учесть в тестах мёрж в отдельном потоке.
+
 BOOST_AUTO_TEST_CASE(SingleOrderPlacementAndCancellingTest)
 {
 	OrderBook book;

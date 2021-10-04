@@ -3,6 +3,7 @@
 #ifndef ORDER_BOOK_H
 #define ORDER_BOOK_H
 
+#include "async_tasks_executor.h"
 #include "Order.h"
 
 struct MarketDataSnapshot;
@@ -55,16 +56,22 @@ private:
 	}
 };
 
+/**
+ * \brief Стакан заявок.
+ * \warning Сведение заявок происходит в отдельном потоке.
+ * \todo удостовериться в том, что тут нет дедлоков и гонок, таки мьютекса теперь два.
+ */
 class OrderBook
 {
 public:
-	using orders_t = boost::multi_index::multi_index_container<
+	using orders_by_id_hashed_unique_index_t = boost::multi_index::hashed_unique<
+		boost::multi_index::tag<struct OrdersById>,
+		boost::multi_index::member<OrderData, decltype(OrderData::order_id), &OrderData::order_id>
+	>;
+	using orders_book_t = boost::multi_index::multi_index_container<
 		OrderData,
 		boost::multi_index::indexed_by<
-			boost::multi_index::hashed_unique<
-				boost::multi_index::tag<struct OrdersById>,
-			    boost::multi_index::member<OrderData, decltype(OrderData::order_id), &OrderData::order_id>
-			>,
+			orders_by_id_hashed_unique_index_t,
 			boost::multi_index::hashed_non_unique<
 				boost::multi_index::tag<struct OrdersByType>,
 				boost::multi_index::const_mem_fun<OrderData, decltype(std::declval<OrderData>().GetType()), &OrderData::GetType>
@@ -87,7 +94,7 @@ public:
 	order_id_t place(std::unique_ptr<Order>);
 	/**
 	 * \brief Отмена заявки
-	 * \return Данные отменённой заявки. Если такой заявки не было, то boost::none.
+	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет), то boost::none.
 	 */
 	boost::optional<OrderData> cancel(order_id_t);
 	/**
@@ -95,28 +102,52 @@ public:
 	 * \return Данные заявки
 	 */
 	OrderData const& get_data(order_id_t);
+	/**
+	 * \brief Получить срез данных, которые есть в стакане на момент вызова.
+	 * \return Срез.
+	 */
 	std::unique_ptr<MarketDataSnapshot> get_snapshot();
 
+	OrderBook()
+	{
+		_merger.StartTasksExecution();
+	}
+	~OrderBook()
+	{
+		_merger.StopTasksExecution();
+	}
 private:
 	/**
-	 * \brief Сведение заявок
+	 * \brief Сведение заявок.
 	 */
-	void _merge(OrderData &new_order);
+	void _merge(order_id_t id);
 	/**
-	 * \brief Удавлетворена ли заявка
+	 * \brief Удавлетворена ли заявка.
 	 */
 	static bool _is_order_satisfied(OrderData const &order);
 	/**
-	 * \brief Получить тип заявки, с которой можно провести слияние
-	 * \param merge_with_me Тип заявки, которая будет сливаться
-	 * \return Тип заявки, с которой можно провести слияние
+	 * \brief Получить тип заявки, с которой можно провести слияние.
+	 * \param merge_with_me Тип заявки, которая будет сливаться.
+	 * \return Тип заявки, с которой можно провести слияние.
 	 */
 	static Order::Type _get_order_type_for_merge_with(Order::Type merge_with_me);
 
-	boost::shared_mutex mutable _mutex;
-	// изменять только в контексте write lock-a мьютекса.
+	// \brief Исполнитель, который, по велению стакана, занимается сведением заявок в отдельном потоке.
+	tools::async::TasksExecutor _merger;
+	
+	boost::shared_mutex mutable _orders_book_mutex;
+	// \warning Изменять только в контексте write lock-a \ref{_orders_book_mutex}`а.
+	// TODO: мб всётаки в атомик его(или синхронайзд)?
 	order_id_t _id_counter = 0;
-	orders_t _orders{};
+	// \warning Изменять только в контексте write lock-a \ref{_orders_book_mutex}`а.
+	orders_book_t _orders_book{};
+
+	boost::shared_mutex mutable _merging_orders_mutex;
+	// \warning Изменять только в контексте write lock-a \ref{_merging_orders_mutex} `а.
+	boost::multi_index::multi_index_container<
+		OrderData,
+		boost::multi_index::indexed_by<orders_by_id_hashed_unique_index_t>
+	> _merging_orders{};
 };
 
 #endif

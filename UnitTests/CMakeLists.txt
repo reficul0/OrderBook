@@ -9,7 +9,7 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 find_package( 
 	Boost 1.64 REQUIRED 
-	COMPONENTS unit_test_framework filesystem system date_time chrono thread locale iostreams
+	COMPONENTS unit_test_framework regex filesystem system date_time chrono thread locale iostreams
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${Boost_INCLUDE_DIRS})
@@ -32,7 +32,7 @@ set_target_properties(OrderBookLib
 )
 
 
-target_link_libraries(${PROJECT_NAME} OrderBookLib boost_unit_test_framework boost_system boost_filesystem boost_chrono boost_thread boost_locale boost_date_time boost_timer boost_iostreams)
+target_link_libraries(${PROJECT_NAME} OrderBookLib boost_regex boost_unit_test_framework boost_system boost_filesystem boost_chrono boost_thread boost_locale boost_date_time boost_timer boost_iostreams)
 if(UNIX)
 	find_library(pthread REQUIRED)
 	target_link_libraries(${PROJECT_NAME} pthread)
