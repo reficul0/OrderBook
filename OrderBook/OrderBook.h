@@ -20,7 +20,7 @@ struct OrderData
 	}
 	OrderData& operator=(OrderData && other)
 		noexcept(noexcept(
-			std::make_unique<Order>(std::declval<OrderType>(), std::declval<price_t>(), std::declval<size_t>())
+			std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<size_t>())
 			))
 	{
 		if (this != &other)
@@ -43,10 +43,11 @@ struct OrderData
 	order_id_t order_id;
 	std::unique_ptr<Order> order;
 private:
+	// Разрешаем копировать данные заявки только для создания снапшота
 	friend struct MarketDataSnapshot;
 	OrderData(OrderData const& other)
 		noexcept(noexcept(
-				std::make_unique<Order>(std::declval<OrderType>(), std::declval<price_t>(), std::declval<size_t>())
+				std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<size_t>())
 			))
 		: order_id(other.order_id)
 		, order(std::make_unique<Order>(other.order->type, other.order->price, other.order->quantity))
@@ -98,13 +99,19 @@ public:
 
 private:
 	/**
+	 * \brief Сведение заявок
+	 */
+	void _merge(OrderData &new_order);
+	/**
 	 * \brief Удавлетворена ли заявка
 	 */
 	static bool _is_order_satisfied(OrderData const &order);
 	/**
-	 * \brief Сведение заявок
+	 * \brief Получить тип заявки, с которой можно провести слияние
+	 * \param merge_with_me Тип заявки, которая будет сливаться
+	 * \return Тип заявки, с которой можно провести слияние
 	 */
-	void _merge(OrderData &new_order);
+	static Order::Type _get_order_type_for_merge_with(Order::Type merge_with_me);
 
 	boost::shared_mutex mutable _mutex;
 	// изменять только в контексте write lock-a мьютекса.

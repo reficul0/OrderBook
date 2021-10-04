@@ -11,7 +11,7 @@ struct MarketDataSnapshot
 	{
 		// TODO: Если будет критичным, то ускорить.
 		auto& orders_by_type = src_orders.get<OrdersByType>();
-		for (uint8_t order_type = 0; order_type < (uint8_t)OrderType::_EnumElementsCount; ++order_type)
+		for (uint8_t order_type = 0; order_type < Order::Type::_EnumElementsCount; ++order_type)
 		{
 			auto const orders_iters_pair = orders_by_type.equal_range(order_type);
 			if (orders_iters_pair.second == orders_iters_pair.first)
@@ -31,7 +31,7 @@ struct MarketDataSnapshot
 		>
 	>;
 
-	std::array<sorted_by_price_orders_t, (size_t)OrderType::_EnumElementsCount> orders;
+	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> orders;
 private:
 	template<typename IterT>
 	void _copy(sorted_by_price_orders_t &dst, IterT src_begin, IterT src_end)

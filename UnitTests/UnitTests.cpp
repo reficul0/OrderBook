@@ -10,7 +10,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderPlacementAndCancellingTest)
 {
 	OrderBook book;
 
-	auto order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, 300));
+	auto order_id = book.place(std::make_unique<Order>(Order::Type::Ask, 4, 300));
 	auto const &order_data = book.get_data(order_id);
 	BOOST_TEST(order_data.GetPrice() == 4);
 	BOOST_TEST(order_data.order->quantity == 300);
@@ -27,10 +27,10 @@ BOOST_AUTO_TEST_CASE(SingleOrderSnapshotGettingTest)
 {
 	OrderBook book;
 
-	auto order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, 300));
+	auto order_id = book.place(std::make_unique<Order>(Order::Type::Ask, 4, 300));
 	auto const &snapshot = book.get_snapshot();
 
-	auto &ascks = snapshot->orders[(uint8_t)OrderType::Ask];
+	auto &ascks = snapshot->orders[Order::Type::Ask];
 	BOOST_TEST(ascks.size() == 1);
 	
 	auto &front_order = *ascks.begin();
@@ -46,17 +46,17 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest)
 
 	auto constexpr summary_quantity = 300;
 	
-	auto const ask_order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, summary_quantity));
-	book.place(std::make_unique<Order>(OrderType::Bid, 4, summary_quantity - 1));
+	auto const ask_order_id = book.place(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
+	book.place(std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - 1));
 	
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &ascks = snapshot->orders[(uint8_t)OrderType::Ask];
+		auto &ascks = snapshot->orders[Order::Type::Ask];
 		// помещённый ask удовлетворён не полностью
 		BOOST_TEST(ascks.size() == 1);
 
-		auto &bids = snapshot->orders[(uint8_t)OrderType::Bid];
+		auto &bids = snapshot->orders[Order::Type::Bid];
 		// а вот бида уже нет
 		BOOST_TEST(bids.empty());
 	}
@@ -65,18 +65,18 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest)
 	// аск всё ещё не удовлетворён
 	BOOST_TEST(order_data.order->quantity == 1);
 
-	book.place(std::make_unique<Order>(OrderType::Bid, 4, 1));
+	book.place(std::make_unique<Order>(Order::Type::Bid, 4, 1));
 	// аск удовлетворён
 	BOOST_CHECK_THROW(book.get_data(ask_order_id), std::exception);
 
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &ascks = snapshot->orders[(uint8_t)OrderType::Ask];
+		auto &ascks = snapshot->orders[Order::Type::Ask];
 		// все вски удовлетворены
 		BOOST_TEST(ascks.empty());
 
-		auto &bids = snapshot->orders[(uint8_t)OrderType::Bid];
+		auto &bids = snapshot->orders[Order::Type::Bid];
 		// все биды удовлетворены
 		BOOST_TEST(bids.empty());
 	}
@@ -90,10 +90,10 @@ BOOST_AUTO_TEST_CASE(TopPriorityOrderMergeTest)
 	auto constexpr second_order_quantity = 1;
 	auto constexpr top_priority_order_quantity = summary_quantity - second_order_quantity;
 	
-	auto const top_priority_order_id = book.place(std::make_unique<Order>(OrderType::Bid, 4, top_priority_order_quantity));
-	auto const less_priority_order_id = book.place(std::make_unique<Order>(OrderType::Bid, 4, second_order_quantity));
+	auto const top_priority_order_id = book.place(std::make_unique<Order>(Order::Type::Bid, 4, top_priority_order_quantity));
+	auto const less_priority_order_id = book.place(std::make_unique<Order>(Order::Type::Bid, 4, second_order_quantity));
 	
-	book.place(std::make_unique<Order>(OrderType::Ask, 4, top_priority_order_quantity));
+	book.place(std::make_unique<Order>(Order::Type::Ask, 4, top_priority_order_quantity));
 	// Должна быть слита самая приоритетная заявка ..
 	BOOST_CHECK_THROW(book.get_data(top_priority_order_id), std::exception);
 	// .. а менее приоритетная не должна.
@@ -107,18 +107,18 @@ BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest)
 	auto constexpr summary_quantity = 300;
 	auto constexpr second_order_quantity = 1;
 	
-	book.place(std::make_unique<Order>(OrderType::Bid, 4, summary_quantity - second_order_quantity));
-	book.place(std::make_unique<Order>(OrderType::Bid, 4, second_order_quantity));
-	auto order_id = book.place(std::make_unique<Order>(OrderType::Ask, 4, summary_quantity));
+	book.place(std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - second_order_quantity));
+	book.place(std::make_unique<Order>(Order::Type::Bid, 4, second_order_quantity));
+	auto order_id = book.place(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
 
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &ascks = snapshot->orders[(uint8_t)OrderType::Ask];
+		auto &ascks = snapshot->orders[Order::Type::Ask];
 		// помещённый ask удовлетворён полностью
 		BOOST_TEST(ascks.empty());
 
-		auto &bids = snapshot->orders[(uint8_t)OrderType::Bid];
+		auto &bids = snapshot->orders[Order::Type::Bid];
 		// биды тоже все удовлетворены
 		BOOST_TEST(bids.empty());
 	}

@@ -8,20 +8,20 @@
 using order_id_t = boost::multiprecision::uint256_t;
 using price_t = double;
 
-enum class OrderType : uint8_t
-{
-	Ask = 0,
-	Bid = 1,
-	_EnumElementsCount
-};
-
 struct Order
 {
-	OrderType type;
+	enum Type : uint8_t
+	{
+		Ask = 0,
+		Bid = 1,
+		_EnumElementsCount
+	};
+	
+	Type type;
 	price_t price;
 	size_t quantity;
 
-	Order(OrderType type, price_t price, size_t quantity) noexcept
+	Order(Type type, price_t price, size_t quantity) noexcept
 		: type(type)
 		, price(price)
 		, quantity(quantity)

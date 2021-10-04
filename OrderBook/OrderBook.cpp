@@ -57,16 +57,11 @@ OrderData const& OrderBook::get_data(order_id_t id)
 	return *order_iter;
 }
 
-bool OrderBook::_is_order_satisfied(OrderData const& order)
-{
-	return order.order->quantity == 0;
-}
-
 void OrderBook::_merge(OrderData &new_order)
 {
 	auto& orders_by_price_and_type = _orders.get<OrdersByPriceAndType>();
 	// Мержить можем если пришедшая заявка - ask, тогда будем мёржить bid-ы, и наоборот.
-	auto const order_type_that_can_be_merged = (uint8_t)!new_order.GetType();
+	auto const order_type_that_can_be_merged = _get_order_type_for_merge_with((Order::Type)new_order.GetType());
 	auto const key_of_merging_orders =  boost::make_tuple(new_order.GetPrice(), order_type_that_can_be_merged);
 
 	// Сначала получим все зявки, которые можно слить с новой заявкой ..
@@ -115,6 +110,18 @@ void OrderBook::_merge(OrderData &new_order)
 	auto& orders_by_id = _orders.get<OrdersById>();
 	for(auto satisfied_order_id : satisfied_orders) 
 		orders_by_id.erase(satisfied_order_id);
+}
+
+bool OrderBook::_is_order_satisfied(OrderData const& order)
+{
+	return order.order->quantity == 0;
+}
+
+Order::Type OrderBook::_get_order_type_for_merge_with(Order::Type merge_with_me)
+{
+	BOOST_STATIC_ASSERT_MSG((size_t)Order::Type::_EnumElementsCount == 2, "На данный момент учитываются только Ask и Bid. При увеличении количества типов заявок, получение типа для мёржа надо переписать.");
+	// Отталкиваемся от знания того, что типа сейчас всего два и один из Ask или Bid равен нулю, а второй не равен нулю.
+	return (Order::Type)!merge_with_me;
 }
 
 std::unique_ptr<MarketDataSnapshot> OrderBook::get_snapshot()
