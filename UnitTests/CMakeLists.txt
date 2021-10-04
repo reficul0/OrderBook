@@ -28,7 +28,7 @@ add_library(OrderBookLib STATIC IMPORTED)
 set_target_properties(OrderBookLib
 	PROPERTIES 
 		IMPORTED_LOCATION "${OrderBookLibDir}${OrderBookLibPath}"
-		INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/tmp
+		INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/OrderBook
 )
 
 
