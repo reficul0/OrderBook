@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 
-#define BOOST_TEST_MODULE NumberTests
+#define BOOST_TEST_MODULE OrderBookTests
 #include <boost/test/included/unit_test.hpp>
 
 #include "OrderBook.h"
