@@ -29,22 +29,16 @@ struct MarketDataSnapshot
 
 	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> orders;
 private:
-	template<typename IterT>
-	void _copy_to(sorted_by_price_orders_t &dst, IterT src_begin, IterT src_end)
-	{
-		for (; src_begin != src_end; ++src_begin)
-		{
-			auto order_copy = *src_begin;
-			dst.emplace(std::move(order_copy));
-		}
-	}
 	template<typename SrcOrdersContainerT>
 	void _copy_orders_of_type(SrcOrdersContainerT const &src, uint8_t order_type)
 	{
 		auto const orders_iters_pair = src.equal_range(order_type);
-		if (orders_iters_pair.second != orders_iters_pair.first)
+		if (orders_iters_pair.second == orders_iters_pair.first)
+			return;
+		for (auto current_order = orders_iters_pair.first; current_order != orders_iters_pair.second; ++current_order)
 		{
-			_copy_to(orders[order_type], orders_iters_pair.first, orders_iters_pair.second);
+			auto order_copy = *current_order;
+			orders[order_type].emplace(std::move(order_copy));
 		}
 	}
 	

@@ -5,10 +5,7 @@
 
 order_id_t OrderBook::post(std::unique_ptr<Order> order)
 {
-	// Приоритет при мёрже у заявки с наименьшим id.
-	boost::unique_lock<boost::shared_mutex> book_read_lock(_orders_book_mutex, boost::defer_lock);
-	boost::unique_lock<boost::shared_mutex> merging_orders_read_lock(_merging_orders_mutex, boost::defer_lock);
-	std::lock(book_read_lock, merging_orders_read_lock);
+	boost::unique_lock<boost::shared_mutex> merging_orders_read_lock(_merging_orders_mutex);
 	/* \warning Не будем лочить \ref{_id_counter} отдельно, ибо здесь всёравно гуляет не больше 1 потока, поскольку это контекст write lock-a.
 	 *		И \ref{_id_counter} изменяется только здесь. В связи со всем этим дополнительной синхронизации не надо.
 	 */

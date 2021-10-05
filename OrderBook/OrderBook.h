@@ -60,7 +60,7 @@ private:
  * \brief Стакан заявок.
  * \warning Сведение заявок происходит в отдельном потоке.
  */
-class OrderBook
+class OrderBook : boost::noncopyable
 {
 public:
 	using orders_by_id_hashed_unique_index_t = boost::multi_index::hashed_unique<
