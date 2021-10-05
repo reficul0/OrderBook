@@ -210,9 +210,8 @@ Order::Type OrderBook::_get_order_type_for_merge_with(Order::Type merge_with_me)
 
 std::unique_ptr<MarketDataSnapshot> OrderBook::get_snapshot()
 {
-	boost::shared_lock<boost::shared_mutex> book_read_lock(_orders_book_mutex, boost::defer_lock);
-	boost::shared_lock<boost::shared_mutex> merging_orders_read_lock(_merging_orders_mutex, boost::defer_lock);
-	std::lock(book_read_lock, merging_orders_read_lock);
-	
-	return std::make_unique<MarketDataSnapshot>(_orders_book, _merging_orders);
+	return std::make_unique<MarketDataSnapshot>(
+		_orders_book, _orders_book_mutex, 
+		_merging_orders, _merging_orders_mutex
+	);
 }
