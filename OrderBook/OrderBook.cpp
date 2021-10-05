@@ -84,50 +84,6 @@ OrderData const& OrderBook::get_data(order_id_t id)
 	throw std::logic_error("There is no order with same id");
 }
 
-void OrderBook::_update_orders_containers_after_merge(
-	boost::upgrade_lock<boost::shared_mutex> &merging_orders_read_lock,
-	boost::upgrade_lock<boost::shared_mutex> &orders_read_lock,
-	typename buffered_orders_t::index<OrdersById>::type::iterator merging_order_iter,
-	std::list<order_id_t> satisfied_orders_from_book
-) {
-	auto &orders_by_id = _orders_book.get<OrdersById>();
-	auto &merging_orders_by_id = _merging_orders.get<OrdersById>();
-
-	// Если в стакане после мёржа есть удовлетворённые заявки ..
-	if(satisfied_orders_from_book.empty() == false)
-	{
-		// .. то удалим их из стакана ..
-		boost::upgrade_to_unique_lock<boost::shared_mutex> book_write_lock(orders_read_lock);
-		for (auto satisfied_order_id : satisfied_orders_from_book)
-		{
-			boost::this_thread::interruption_point();
-			orders_by_id.erase(satisfied_order_id);
-		}
-	}
-
-	boost::optional<OrderData> merging_order_data;
-	{
-		boost::upgrade_to_unique_lock<boost::shared_mutex> merging_orders_write_lock(merging_orders_read_lock);
-		// Если добавляемая заявка всё ещё не удовлетворена ..
-		if (_is_order_satisfied(*merging_order_iter) == false)
-		{
-			// .. получим её данные для добавления в стакан ..
-			merging_order_data = std::move(merging_order_iter.get_node()->value());
-		}
-		// .. после чего удалим её из списка сливаемых заявок.
-		merging_orders_by_id.erase(merging_order_iter);
-	}
-	// Если заявку надо добавить в стакан(она не удовлетворена после мёржа) ..
-	if (merging_order_data.is_initialized())
-	{
-		boost::upgrade_to_unique_lock<boost::shared_mutex> book_write_lock(orders_read_lock);
-		auto new_order_iter = orders_by_id.find(merging_order_data->order_id);
-		assert(new_order_iter == orders_by_id.end());
-
-		new_order_iter = orders_by_id.emplace_hint(new_order_iter, std::move(*merging_order_data));
-		assert(new_order_iter != orders_by_id.end());
-	}
-}
 
 void OrderBook::_merge(order_id_t id)
 {
@@ -135,13 +91,15 @@ void OrderBook::_merge(order_id_t id)
 	boost::upgrade_lock<boost::shared_mutex> merging_orders_read_lock(_merging_orders_mutex);
 	
 	auto &merging_orders_by_id = _merging_orders.get<OrdersById>();
-	auto merging_order_iter = merging_orders_by_id.find(id);
-	if(merging_order_iter == merging_orders_by_id.end())
+	auto new_order_iter = merging_orders_by_id.find(id);
+	if(new_order_iter == merging_orders_by_id.end())
 	{
 		// добавление заявки отменили.
 		return;
 	}
-	OrderData const &new_order = *merging_order_iter;
+	OrderData const &new_order = *new_order_iter;
+	// Закешируем, чтобы лишний раз не блокировать доступ к контейнеру сливаемых заявок.
+	auto new_order_quantity = new_order.order->quantity;
 
 	// Мержим заявки из стакана с новоприбывшей.
 	{
@@ -154,55 +112,91 @@ void OrderBook::_merge(order_id_t id)
 
 		// Сначала получим все зявки, которые можно слить с новой заявкой ..
 		auto orders_for_merge_iters_pair = orders_by_price_and_type.equal_range(key_of_merging_orders);
-		// .. если таких нет ..
-		if (orders_for_merge_iters_pair.first == orders_for_merge_iters_pair.second)
-		{
-			_update_orders_containers_after_merge(merging_orders_read_lock, orders_read_lock, merging_order_iter);
-			// .. сливать больше нечего.
-			return;
-		}
-
+		
 		std::list<order_id_t> satisfied_orders_from_book;
-		while (true)
+		auto update_orders_containers_after_merge = [&]()
 		{
-			boost::this_thread::interruption_point();
-			if (_is_order_satisfied(*merging_order_iter))
-				// .. сливать больше нечего.
-				break;
+			auto &orders_by_id = _orders_book.get<OrdersById>();
 
-			boost::upgrade_to_unique_lock<boost::shared_mutex> orders_write_lock(orders_read_lock);
-			// Первой сливается заявка, которая была зарегистрирована раньше других.
-			// При этом, если слияние займёт больше 1-й итерации, то учтём, что мы можем встретить уже удовлетворённые заявки.
-			// Уже удовлетворённые не удаляем сразу, а удалим после мёржа, так эффективнее.
-			auto iter_to_merging_order_with_top_prioroty = std::min_element(
-				orders_for_merge_iters_pair.first,
-				orders_for_merge_iters_pair.second,
-				[](decltype(*orders_for_merge_iters_pair.first) lhs, decltype(*orders_for_merge_iters_pair.first) rhs)
+			// Если в стакане после мёржа есть удовлетворённые заявки ..
+			if (satisfied_orders_from_book.empty() == false)
+			{
+				// .. то удалим их из стакана ..
+				boost::upgrade_to_unique_lock<boost::shared_mutex> book_write_lock(orders_read_lock);
+				for (auto satisfied_order_id : satisfied_orders_from_book)
 				{
-					return lhs.order_id < rhs.order_id
-						&& _is_order_satisfied(lhs) == false;
+					boost::this_thread::interruption_point();
+					orders_by_id.erase(satisfied_order_id);
 				}
-			);
-			// Если заявка для слияния найдена ..
-			if (iter_to_merging_order_with_top_prioroty != orders_for_merge_iters_pair.second
-				// .. и она не удовлетворена ..
-				&& _is_order_satisfied(*iter_to_merging_order_with_top_prioroty) == false
-			) {
-				{
-					boost::upgrade_to_unique_lock<boost::shared_mutex> merging_orders_write_lock(merging_orders_read_lock);
-					// .. сливаем её.
-					auto const quantity = (std::min)(new_order.order->quantity, iter_to_merging_order_with_top_prioroty->order->quantity);
-					new_order.order->quantity -= quantity;
-					iter_to_merging_order_with_top_prioroty->order->quantity -= quantity;
-				}
-
-				if (_is_order_satisfied(*iter_to_merging_order_with_top_prioroty))
-					satisfied_orders_from_book.emplace_back(iter_to_merging_order_with_top_prioroty->order_id);
 			}
-			else // Иначе заявок для слияния больше нет.
-				break;
+
+			boost::optional<OrderData> merging_order_data;
+			{
+				boost::upgrade_to_unique_lock<boost::shared_mutex> merging_orders_write_lock(merging_orders_read_lock);
+				// Если добавляемая заявка всё ещё не удовлетворена ..
+				if (new_order_quantity != 0)
+				{
+					// .. получим её данные для добавления в стакан ..
+					merging_order_data = std::move(new_order_iter.get_node()->value());
+				}
+				// .. после чего удалим её из списка сливаемых заявок.
+				merging_orders_by_id.erase(new_order_iter);
+			}
+			// Если заявку надо добавить в стакан(она не удовлетворена после мёржа) ..
+			if (merging_order_data.is_initialized())
+			{
+				boost::upgrade_to_unique_lock<boost::shared_mutex> book_write_lock(orders_read_lock);
+				auto new_order_in_book_iter = orders_by_id.find(merging_order_data->order_id);
+				assert(new_order_in_book_iter == orders_by_id.end());
+
+				new_order_in_book_iter = orders_by_id.emplace_hint(new_order_in_book_iter, std::move(*merging_order_data));
+				assert(new_order_in_book_iter != orders_by_id.end());
+			}
+		};
+		// .. если есть с кем сливать..
+		if (orders_for_merge_iters_pair.first != orders_for_merge_iters_pair.second)
+		{
+			// .. то сливаем.
+			while (true)
+			{
+				boost::this_thread::interruption_point();
+				// Если сливаемая заявка удовлетворена ..
+				if (new_order_quantity == 0)
+					// .. то сливать больше нечего.
+					break;
+
+				boost::upgrade_to_unique_lock<boost::shared_mutex> orders_write_lock(orders_read_lock);
+				// Первой сливается заявка, которая была зарегистрирована раньше других.
+				// При этом, если слияние займёт больше 1-й итерации, то учтём, что мы можем встретить уже удовлетворённые заявки.
+				// Уже удовлетворённые не удаляем сразу, а удалим после мёржа, так эффективнее.
+				auto iter_to_merging_order_with_top_prioroty = std::min_element(
+					orders_for_merge_iters_pair.first,
+					orders_for_merge_iters_pair.second,
+					[](decltype(*orders_for_merge_iters_pair.first) lhs, decltype(*orders_for_merge_iters_pair.first) rhs)
+					{
+						return lhs.order_id < rhs.order_id
+							&& _is_order_satisfied(lhs) == false;
+					}
+				);
+				// Если заявка для слияния найдена ..
+				if (iter_to_merging_order_with_top_prioroty != orders_for_merge_iters_pair.second
+					// .. и она не удовлетворена ..
+					&& _is_order_satisfied(*iter_to_merging_order_with_top_prioroty) == false
+				) {
+						// .. сливаем её.
+						auto const quantity = (std::min)(new_order_quantity, iter_to_merging_order_with_top_prioroty->order->quantity);
+						new_order_quantity -= quantity;
+						iter_to_merging_order_with_top_prioroty->order->quantity -= quantity;
+						// Если после мёржа заявка из стакана удовлетворена ..
+						if (_is_order_satisfied(*iter_to_merging_order_with_top_prioroty))
+							// .. отметим, что её надо удалить.
+							satisfied_orders_from_book.emplace_back(iter_to_merging_order_with_top_prioroty->order_id);
+				}
+				else // Иначе заявок для слияния больше нет.
+					break;
+			}
 		}
-		_update_orders_containers_after_merge(merging_orders_read_lock, orders_read_lock, merging_order_iter, std::move(satisfied_orders_from_book));
+		update_orders_containers_after_merge();
 	}
 }
 

@@ -7,6 +7,7 @@
 
 using order_id_t = boost::multiprecision::uint256_t;
 using price_t = double;
+using quantity_t = size_t;
 
 struct Order
 {
@@ -19,9 +20,9 @@ struct Order
 	
 	Type type;
 	price_t price;
-	size_t quantity;
+	quantity_t quantity;
 
-	Order(Type type, price_t price, size_t quantity) noexcept
+	Order(Type type, price_t price, quantity_t quantity) noexcept
 		: type(type)
 		, price(price)
 		, quantity(quantity)

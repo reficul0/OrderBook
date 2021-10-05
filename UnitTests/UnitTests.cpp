@@ -131,3 +131,17 @@ BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest)
 		BOOST_TEST(bids.empty());
 	}
 }
+
+BOOST_AUTO_TEST_CASE(StressTest)
+{
+	OrderBook book;
+
+	auto constexpr summary_quantity = 100000;
+	for(size_t i = 0; i < summary_quantity; ++i)
+		book.place(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity - i));
+	
+	for (size_t i = 0; i < summary_quantity; ++i)
+		book.place(std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - i));
+
+	boost::this_thread::sleep_for(boost::chrono::seconds(5));
+}

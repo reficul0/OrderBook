@@ -21,7 +21,7 @@ struct OrderData
 	}
 	OrderData& operator=(OrderData && other)
 		noexcept(noexcept(
-			std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<size_t>())
+			std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
 			))
 	{
 		if (this != &other)
@@ -48,7 +48,7 @@ private:
 	friend struct MarketDataSnapshot;
 	OrderData(OrderData const& other)
 		noexcept(noexcept(
-				std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<size_t>())
+				std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
 			))
 		: order_id(other.order_id)
 		, order(std::make_unique<Order>(other.order->type, other.order->price, other.order->quantity))
@@ -142,12 +142,6 @@ private:
 			orders_by_type_hashed_non_unique_index_t
 		>
 	>;
-	void _update_orders_containers_after_merge(
-		boost::upgrade_lock<boost::shared_mutex> &merging_orders_read_lock,
-		boost::upgrade_lock<boost::shared_mutex> &orders_read_lock,
-		typename buffered_orders_t::index<OrdersById>::type::iterator merging_order_iter,
-		std::list<order_id_t> satisfied_orders_from_book = {}
-	);
 
 	// \brief Исполнитель, который, по велению стакана, занимается сведением заявок в отдельном потоке.
 	tools::async::TasksExecutor _merger;
