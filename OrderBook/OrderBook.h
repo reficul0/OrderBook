@@ -94,66 +94,25 @@ public:
 	order_id_t post(std::unique_ptr<Order>);
 	/**
 	 * \brief Отмена заявки
-	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет), то boost::none.
+	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет, то есть её отменили), то boost::none.
 	 */
 	boost::optional<OrderData> cancel(order_id_t);
 	/**
 	 * \brief Получение данных заявки
 	 * \return Данные заявки
 	 */
-	OrderData const& get_data(order_id_t);
+	OrderData const& get_data(order_id_t) const;
 	/**
 	 * \brief Получить срез данных, которые есть в стакане на момент вызова.
 	 * \return Срез.
 	 */
-	std::unique_ptr<MarketDataSnapshot> get_snapshot();
+	std::unique_ptr<MarketDataSnapshot> get_snapshot() const;
 
-	OrderBook()
-	{
-		_merger.StartTasksExecution();
-	}
-	~OrderBook()
-	{
-		_merger.StopTasksExecution();
-	}
+	OrderBook();
+	~OrderBook();
 private:
-	/**
-	 * \brief Сведение заявок.
-	 */
-	void _merge(order_id_t id);
-	/**
-	 * \brief Удавлетворена ли заявка.
-	 */
-	static bool _is_order_satisfied(OrderData const &order);
-	/**
-	 * \brief Получить тип заявки, с которой можно провести слияние.
-	 * \param merge_with_me Тип заявки, которая будет сливаться.
-	 * \return Тип заявки, с которой можно провести слияние.
-	 */
-	static Order::Type _get_order_type_for_merge_with(Order::Type merge_with_me);
-
-	// Чтобы не выставлять информацию про буффер наружу. Но она нужна при формировании снапшота.
-	friend struct MarketDataSnapshot;
-	using buffered_orders_t = boost::multi_index::multi_index_container<
-		OrderData,
-		boost::multi_index::indexed_by<
-			orders_by_id_hashed_unique_index_t,
-			orders_by_type_hashed_non_unique_index_t
-		>
-	>;
-
-	// \brief Исполнитель, который, по велению стакана, занимается сведением заявок в отдельном потоке.
-	tools::async::TasksExecutor _merger;
-	
-	boost::shared_mutex mutable _orders_book_mutex;
-	// \warning Изменять только в контексте write lock-a \ref{_orders_book_mutex}`а.
-	order_id_t _id_counter = 0;
-	// \warning Изменять только в контексте write lock-a \ref{_orders_book_mutex}`а.
-	orders_book_t _orders_book{};
-
-	boost::shared_mutex mutable _merging_orders_mutex;
-	// \warning Изменять только в контексте write lock-a \ref{_merging_orders_mutex} `а.
-	buffered_orders_t _merging_orders{};
+	class Impl;
+	std::unique_ptr<Impl> _impl;
 };
 
 #endif

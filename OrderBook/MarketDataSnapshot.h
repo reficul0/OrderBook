@@ -7,14 +7,10 @@
 
 struct MarketDataSnapshot
 {
-	explicit MarketDataSnapshot(
-		OrderBook::orders_book_t const &book_orders, boost::shared_mutex &book_mutex, 
-		OrderBook::buffered_orders_t const &buffered_orders, boost::shared_mutex &buffered_orders_mutex
-	) {
-		// TODO: Если будет критичным, то ускорить.
-		_copy(book_orders, book_mutex);
-		_copy(buffered_orders, buffered_orders_mutex);
-	}
+	MarketDataSnapshot() = default;
+
+	template<typename OrdersContainerT>
+	void add_orders(OrdersContainerT const &orders);
 
 	using sorted_by_price_orders_t = boost::multi_index::multi_index_container<
 		OrderData,
@@ -26,13 +22,16 @@ struct MarketDataSnapshot
 			>
 		>
 	>;
+	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> orders{};
+};
 
-	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> orders;
-private:
-	template<typename SrcOrdersContainerT>
-	void _copy_orders_of_type(SrcOrdersContainerT const &src, uint8_t order_type)
+template<typename OrdersContainerT>
+inline void MarketDataSnapshot::add_orders(OrdersContainerT const &orders_container)
+{
+	auto &orders_by_type = orders_container.template get<OrdersByType>();
+	for (uint8_t order_type = 0; order_type < Order::Type::_EnumElementsCount; ++order_type)
 	{
-		auto const orders_iters_pair = src.equal_range(order_type);
+		auto const orders_iters_pair = orders_by_type.equal_range(order_type);
 		if (orders_iters_pair.second == orders_iters_pair.first)
 			return;
 		for (auto current_order = orders_iters_pair.first; current_order != orders_iters_pair.second; ++current_order)
@@ -41,15 +40,6 @@ private:
 			orders[order_type].emplace(std::move(order_copy));
 		}
 	}
-	
-	template<typename OrdersContainerT>
-	void _copy(OrdersContainerT &container, boost::shared_mutex &container_mutex)
-	{
-		boost::shared_lock<boost::shared_mutex> container_read_lock(container_mutex);
-		auto &orders_by_type = container.template get<OrdersByType>();
-		for (uint8_t order_type = 0; order_type < Order::Type::_EnumElementsCount; ++order_type)
-			_copy_orders_of_type(orders_by_type, order_type);
-	}
-};
+}
 
 #endif
