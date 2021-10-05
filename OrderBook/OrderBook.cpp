@@ -3,27 +3,23 @@
 #include "OrderBook.h"
 #include "MarketDataSnapshot.h"
 
-order_id_t OrderBook::place(std::unique_ptr<Order> order)
+order_id_t OrderBook::post(std::unique_ptr<Order> order)
 {
 	// Приоритет при мёрже у заявки с наименьшим id.
-	// Простенькая реализация для удовлетворения этой цели через врайт лок всего этапа мёржа и добавления в стакан.
-	boost::unique_lock<boost::shared_mutex> write_lock(_orders_book_mutex);
+	boost::unique_lock<boost::shared_mutex> book_read_lock(_orders_book_mutex, boost::defer_lock);
+	boost::unique_lock<boost::shared_mutex> merging_orders_read_lock(_merging_orders_mutex, boost::defer_lock);
+	std::lock(book_read_lock, merging_orders_read_lock);
 	/* \warning Не будем лочить \ref{_id_counter} отдельно, ибо здесь всёравно гуляет не больше 1 потока, поскольку это контекст write lock-a.
 	 *		И \ref{_id_counter} изменяется только здесь. В связи со всем этим дополнительной синхронизации не надо.
 	 */
 	auto order_id = ++_id_counter;
 
-	{
-		boost::upgrade_lock<boost::shared_mutex> merging_orders_read_lock(_merging_orders_mutex);
-		
-		auto& merging_orders_by_id = _merging_orders.get<OrdersById>();
-		auto merging_order_iter = merging_orders_by_id.find(order_id);
-		assert(merging_order_iter == merging_orders_by_id.end());
-		
-		boost::upgrade_to_unique_lock<boost::shared_mutex> merging_orders_write_lock(merging_orders_read_lock);
-		merging_order_iter = merging_orders_by_id.emplace_hint(merging_order_iter, OrderData(order_id, std::move(order)));
-		assert(merging_order_iter != _merging_orders.end());
-	}
+	auto& merging_orders_by_id = _merging_orders.get<OrdersById>();
+	auto merging_order_iter = merging_orders_by_id.find(order_id);
+	assert(merging_order_iter == merging_orders_by_id.end());
+	
+	merging_order_iter = merging_orders_by_id.emplace_hint(merging_order_iter, OrderData(order_id, std::move(order)));
+	assert(merging_order_iter != _merging_orders.end());
 	
 	_merger.GetStrand().post([this, order_id]() mutable { _merge(order_id); });
 	
@@ -83,7 +79,6 @@ OrderData const& OrderBook::get_data(order_id_t id)
 	
 	throw std::logic_error("There is no order with same id");
 }
-
 
 void OrderBook::_merge(order_id_t id)
 {
@@ -145,6 +140,7 @@ void OrderBook::_merge(order_id_t id)
 			// Если заявку надо добавить в стакан(она не удовлетворена после мёржа) ..
 			if (merging_order_data.is_initialized())
 			{
+				merging_order_data->order->quantity = new_order_quantity;
 				boost::upgrade_to_unique_lock<boost::shared_mutex> book_write_lock(orders_read_lock);
 				auto new_order_in_book_iter = orders_by_id.find(merging_order_data->order_id);
 				assert(new_order_in_book_iter == orders_by_id.end());

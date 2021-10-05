@@ -92,7 +92,7 @@ public:
 	 * \brief Постановка заявок
 	 * \return id заявки
 	 */
-	order_id_t place(std::unique_ptr<Order>);
+	order_id_t post(std::unique_ptr<Order>);
 	/**
 	 * \brief Отмена заявки
 	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет), то boost::none.
@@ -148,7 +148,6 @@ private:
 	
 	boost::shared_mutex mutable _orders_book_mutex;
 	// \warning Изменять только в контексте write lock-a \ref{_orders_book_mutex}`а.
-	// TODO: мб всётаки в атомик его(или синхронайзд)?
 	order_id_t _id_counter = 0;
 	// \warning Изменять только в контексте write lock-a \ref{_orders_book_mutex}`а.
 	orders_book_t _orders_book{};
