@@ -6,3 +6,10 @@
 ### Requirements
 
 * [Required] - [Boost (1.64 or newer)](http://www.boost.org/).
+
+## System Compatibility
+
+OS           | Compiler      | Status
+------------ | ------------- | -------------
+Windows      | msvc15        | :white_check_mark: Working
+Linux        | gcc           | :white_check_mark: Working
