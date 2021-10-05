@@ -192,20 +192,8 @@ void get_snapshot_thread(OrderBook &book)
 	{
 		while (true)
 		{
-			auto constexpr max_quantity = 3000;
-			for (size_t i = 0; i < max_quantity; ++i)
-			{
-				boost::this_thread::interruption_point();
-				book.post(std::make_unique<Order>(Order::Type::Ask, 4, max_quantity - i));
-			}
-
-			// Бида пусть будут в обратном порядке, для того, чтобы мёрж был ещё дольше
-			for (size_t i = 0; i < max_quantity; ++i)
-			{
-				boost::this_thread::interruption_point();
-				book.post(std::make_unique<Order>(Order::Type::Bid, 4, i));
-			}
-
+			boost::this_thread::interruption_point();
+			auto snapshot = book.get_snapshot();
 		}
 	}
 	catch (const boost::thread_interrupted&)
@@ -299,23 +287,27 @@ BOOST_AUTO_TEST_CASE(GetDataAndGetSnapshotWhenPostDeadlockTest, *boost::unit_tes
 /////////////////////////////////////////////////////////////////////////////////////////////////
 ////// Проверка операций на то, что они будут прерваны по первому велению юзера
 /////////////////////////////////////////////////////////////////////////////////////////////////
-BOOST_AUTO_TEST_CASE(OrdersMergingInterruptionTest, *boost::unit_test::timeout(1)/*не ждём пока закончится мёрж, он должен быть прерван*/)
+BOOST_AUTO_TEST_CASE(OrdersMergingInterruptionTest, *boost::unit_test::timeout(10))
 {
-	OrderBook book;
+	std::unique_ptr<OrderBook> book = std::make_unique<OrderBook>();
 
 	// Сначала нагрузим побольше заявок для мёржа.
 
 	auto constexpr max_quantity = 3000;
 	for (size_t i = 0; i < max_quantity; ++i)
-		book.post(std::make_unique<Order>(Order::Type::Ask, 4, max_quantity - i));
+		book->post(std::make_unique<Order>(Order::Type::Ask, 4, max_quantity - i));
 
 	BOOST_TEST_PASSPOINT();
 
 	// Бида пусть будут в обратном порядке, для того, чтобы мёрж был ещё дольше
 	for (size_t i = 0; i < max_quantity; ++i)
-		book.post(std::make_unique<Order>(Order::Type::Bid, 4, i));
+		book->post(std::make_unique<Order>(Order::Type::Bid, 4, i));
 	
+	boost::thread merge_interruption_thread(
+		[&book] { book.reset(); }
+	);
 	// мёрж должен быть прерван при разрушении объекта стакана
+	BOOST_TEST( merge_interruption_thread.try_join_for(boost::chrono::seconds(1)) );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
