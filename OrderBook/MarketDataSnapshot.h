@@ -7,16 +7,15 @@
 
 struct MarketDataSnapshot
 {
-	explicit MarketDataSnapshot(OrderBook::orders_book_t const &src_orders)
+	explicit MarketDataSnapshot(OrderBook::orders_book_t const &book_orders, OrderBook::buffered_orders_t const &buffered_orders)
 	{
 		// TODO: Если будет критичным, то ускорить.
-		auto& orders_by_type = src_orders.get<OrdersByType>();
+		auto& book_orders_by_type = book_orders.get<OrdersByType>();
+		auto& buffered_orders_by_type = buffered_orders.get<OrdersByType>();
 		for (uint8_t order_type = 0; order_type < Order::Type::_EnumElementsCount; ++order_type)
 		{
-			auto const orders_iters_pair = orders_by_type.equal_range(order_type);
-			if (orders_iters_pair.second == orders_iters_pair.first)
-				continue;
-			_copy(orders[order_type], orders_iters_pair.first, orders_iters_pair.second);
+			_copy_orders_of_type(book_orders_by_type, order_type);
+			_copy_orders_of_type(buffered_orders_by_type, order_type);
 		}
 	}
 
@@ -40,6 +39,16 @@ private:
 		{
 			auto order_copy = *src_begin;
 			dst.emplace(std::move(order_copy));
+		}
+	}
+	
+	template<typename SrcOrdersContainerT>
+	void _copy_orders_of_type(SrcOrdersContainerT const &src, uint8_t order_type)
+	{
+		auto const orders_iters_pair = src.equal_range(order_type);
+		if (orders_iters_pair.second != orders_iters_pair.first)
+		{
+			_copy(orders[order_type], orders_iters_pair.first, orders_iters_pair.second);
 		}
 	}
 };

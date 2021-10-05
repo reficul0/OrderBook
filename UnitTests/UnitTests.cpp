@@ -1,12 +1,18 @@
 ﻿#include "pch.h"
 
 #define BOOST_TEST_MODULE OrderBookTests
+#include <boost/chrono/ceil.hpp>
 #include <boost/test/included/unit_test.hpp>
 
 #include "OrderBook.h"
 #include "MarketDataSnapshot.h"
 
-// TODO: учесть в тестах мёрж в отдельном потоке.
+void place_for_merge(OrderBook &book, std::unique_ptr<Order> order, boost::chrono::milliseconds wait_for_merge_timeout = boost::chrono::milliseconds(100))
+{
+	book.place(std::move(order));
+	// даём время на мёрж 
+	boost::this_thread::sleep_for(wait_for_merge_timeout);
+}
 
 BOOST_AUTO_TEST_CASE(SingleOrderPlacementAndCancellingTest)
 {
@@ -49,7 +55,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest)
 	auto constexpr summary_quantity = 300;
 	
 	auto const ask_order_id = book.place(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
-	book.place(std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - 1));
+	place_for_merge(book, std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - 1));
 	
 	{
 		auto const &snapshot = book.get_snapshot();
@@ -67,7 +73,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest)
 	// аск всё ещё не удовлетворён
 	BOOST_TEST(order_data.order->quantity == 1);
 
-	book.place(std::make_unique<Order>(Order::Type::Bid, 4, 1));
+	place_for_merge(book, std::make_unique<Order>(Order::Type::Bid, 4, 1));
 	// аск удовлетворён
 	BOOST_CHECK_THROW(book.get_data(ask_order_id), std::exception);
 
@@ -94,8 +100,8 @@ BOOST_AUTO_TEST_CASE(TopPriorityOrderMergeTest)
 	
 	auto const top_priority_order_id = book.place(std::make_unique<Order>(Order::Type::Bid, 4, top_priority_order_quantity));
 	auto const less_priority_order_id = book.place(std::make_unique<Order>(Order::Type::Bid, 4, second_order_quantity));
-	
-	book.place(std::make_unique<Order>(Order::Type::Ask, 4, top_priority_order_quantity));
+
+	place_for_merge(book, std::make_unique<Order>(Order::Type::Ask, 4, top_priority_order_quantity));
 	// Должна быть слита самая приоритетная заявка ..
 	BOOST_CHECK_THROW(book.get_data(top_priority_order_id), std::exception);
 	// .. а менее приоритетная не должна.
@@ -111,7 +117,7 @@ BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest)
 	
 	book.place(std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - second_order_quantity));
 	book.place(std::make_unique<Order>(Order::Type::Bid, 4, second_order_quantity));
-	auto order_id = book.place(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
+	place_for_merge(book, std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
 
 	{
 		auto const &snapshot = book.get_snapshot();

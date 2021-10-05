@@ -68,14 +68,15 @@ public:
 		boost::multi_index::tag<struct OrdersById>,
 		boost::multi_index::member<OrderData, decltype(OrderData::order_id), &OrderData::order_id>
 	>;
+	using orders_by_type_hashed_non_unique_index_t = boost::multi_index::hashed_non_unique<
+		boost::multi_index::tag<struct OrdersByType>,
+		boost::multi_index::const_mem_fun<OrderData, decltype(std::declval<OrderData>().GetType()), &OrderData::GetType>
+	>;
 	using orders_book_t = boost::multi_index::multi_index_container<
 		OrderData,
 		boost::multi_index::indexed_by<
 			orders_by_id_hashed_unique_index_t,
-			boost::multi_index::hashed_non_unique<
-				boost::multi_index::tag<struct OrdersByType>,
-				boost::multi_index::const_mem_fun<OrderData, decltype(std::declval<OrderData>().GetType()), &OrderData::GetType>
-			>,
+			orders_by_type_hashed_non_unique_index_t,
 			boost::multi_index::hashed_non_unique<
 				boost::multi_index::tag<struct OrdersByPriceAndType>,
 			    boost::multi_index::composite_key<
@@ -132,6 +133,22 @@ private:
 	 */
 	static Order::Type _get_order_type_for_merge_with(Order::Type merge_with_me);
 
+	// Чтобы не выставлять информацию про буффер наружу. Но она нужна при формировании снапшота.
+	friend struct MarketDataSnapshot;
+	using buffered_orders_t = boost::multi_index::multi_index_container<
+		OrderData,
+		boost::multi_index::indexed_by<
+			orders_by_id_hashed_unique_index_t,
+			orders_by_type_hashed_non_unique_index_t
+		>
+	>;
+	void _update_orders_containers_after_merge(
+		boost::upgrade_lock<boost::shared_mutex> &merging_orders_read_lock,
+		boost::upgrade_lock<boost::shared_mutex> &orders_read_lock,
+		typename buffered_orders_t::index<OrdersById>::type::iterator merging_order_iter,
+		std::list<order_id_t> satisfied_orders_from_book = {}
+	);
+
 	// \brief Исполнитель, который, по велению стакана, занимается сведением заявок в отдельном потоке.
 	tools::async::TasksExecutor _merger;
 	
@@ -144,10 +161,7 @@ private:
 
 	boost::shared_mutex mutable _merging_orders_mutex;
 	// \warning Изменять только в контексте write lock-a \ref{_merging_orders_mutex} `а.
-	boost::multi_index::multi_index_container<
-		OrderData,
-		boost::multi_index::indexed_by<orders_by_id_hashed_unique_index_t>
-	> _merging_orders{};
+	buffered_orders_t _merging_orders{};
 };
 
 #endif
