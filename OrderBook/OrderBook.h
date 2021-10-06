@@ -13,11 +13,11 @@ struct OrderData
 	OrderData() = default;
 	OrderData(order_id_t order_id, std::unique_ptr<Order> order) noexcept
 		: order_id(std::move(order_id))
-		, order(std::move(order))
+		, _order(std::move(order))
 	{}
 	OrderData(OrderData &&other) noexcept
 		: order_id(std::move(other.order_id))
-		, order(std::move(other.order))
+		, _order(std::move(other._order))
 	{
 	}
 	OrderData& operator=(OrderData && other)
@@ -28,22 +28,26 @@ struct OrderData
 		if (this != &other)
 		{
 			this->order_id = std::move(other.order_id);
-			this->order = std::move(other.order);
+			this->_order = std::move(other._order);
 		}
 		return *this;
 	}
 
 	price_t GetPrice() const
 	{
-		return order->price;
+		return _order->price;
 	}
 	typename std::underlying_type<decltype(Order::type)>::type GetType() const
 	{
-		return static_cast<typename std::underlying_type<decltype(Order::type)>::type>(order->type);
+		return static_cast<typename std::underlying_type<decltype(Order::type)>::type>(_order->type);
+	}
+
+	quantity_t &GetQuantity() const
+	{
+		return _order->quantity;
 	}
 	
 	order_id_t order_id;
-	std::unique_ptr<Order> order;
 private:
 	// Разрешаем копировать данные заявки только для создания снапшота
 	friend struct MarketDataSnapshot;
@@ -52,9 +56,11 @@ private:
 				std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
 			))
 		: order_id(other.order_id)
-		, order(std::make_unique<Order>(other.order->type, other.order->price, other.order->quantity))
+		, _order(std::make_unique<Order>(other._order->type, other._order->price, other._order->quantity))
 	{
 	}
+
+	std::unique_ptr<Order> _order;
 };
 
 /**

@@ -170,7 +170,7 @@ private:
 				}
 
 				// Если заявку надо добавить в стакан(она не удовлетворена после мёржа) ..
-				if (new_order.order->quantity != 0)
+				if (new_order.GetQuantity() != 0)
 				{
 					auto new_order_in_book_iter = orders_by_id.find(new_order.order_id);
 					assert(new_order_in_book_iter == orders_by_id.end());
@@ -189,7 +189,7 @@ private:
 				{
 					boost::this_thread::interruption_point();
 					// Если сливаемая заявка удовлетворена ..
-					if (new_order.order->quantity == 0)
+					if (new_order.GetQuantity() == 0)
 						// .. то сливать больше нечего.
 						break;
 
@@ -211,10 +211,12 @@ private:
 						// .. и она не удовлетворена ..
 						&& _is_order_satisfied(*iter_to_merging_order_with_top_prioroty) == false
 					) {
+						auto &new_order_quantity = new_order.GetQuantity();
+						auto &merging_order_with_top_prioroty_quantity = iter_to_merging_order_with_top_prioroty->GetQuantity();
 						// .. сливаем её.
-						auto const quantity = (std::min)(new_order.order->quantity, iter_to_merging_order_with_top_prioroty->order->quantity);
-						new_order.order->quantity -= quantity;
-						iter_to_merging_order_with_top_prioroty->order->quantity -= quantity;
+						auto const quantity = (std::min)(new_order_quantity, merging_order_with_top_prioroty_quantity);
+						new_order_quantity -= quantity;
+						merging_order_with_top_prioroty_quantity -= quantity;
 						// Если после мёржа заявка из стакана удовлетворена ..
 						if (_is_order_satisfied(*iter_to_merging_order_with_top_prioroty))
 							// .. отметим, что её надо удалить.
@@ -232,7 +234,7 @@ private:
 	 */
 	static bool _is_order_satisfied(OrderData const &order)
 	{
-		return order.order->quantity == 0;
+		return order.GetQuantity() == 0;
 	}
 	/**
 	 * \brief Получить тип заявки, с которой можно провести слияние.

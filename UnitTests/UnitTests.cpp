@@ -28,12 +28,12 @@ BOOST_AUTO_TEST_CASE(SingleOrderPostingAndCancellingTest)
 	
 	auto const &order_data = book.get_data(order_id);
 	BOOST_TEST(order_data.GetPrice() == 4);
-	BOOST_TEST(order_data.order->quantity == 300);
+	BOOST_TEST(order_data.GetQuantity() == 300);
 	
 	auto cancelled_order_data = book.cancel(order_id);
 	BOOST_TEST(cancelled_order_data.is_initialized());
 	BOOST_TEST(cancelled_order_data->GetPrice() == 4);
-	BOOST_TEST(cancelled_order_data->order->quantity == 300);
+	BOOST_TEST(cancelled_order_data->GetQuantity() == 300);
 
 	BOOST_CHECK_THROW(book.get_data(order_id), std::exception);
 }
@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderSnapshotGettingTest)
 	
 	BOOST_TEST(front_order.order_id == order_id);
 	BOOST_TEST(front_order.GetPrice() == 4);
-	BOOST_TEST(front_order.order->quantity == 300);
+	BOOST_TEST(front_order.GetQuantity() == 300);
 }
 
 BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
 
 	auto const &order_data = book.get_data(ask_order_id);
 	// аск всё ещё не удовлетворён
-	BOOST_TEST(order_data.order->quantity == 1);
+	BOOST_TEST(order_data.GetQuantity() == 1);
 
 	post_and_wait_for_merge(book, std::make_unique<Order>(Order::Type::Bid, 4, 1));
 	// аск удовлетворён
@@ -399,7 +399,7 @@ BOOST_AUTO_TEST_CASE(ALotOfOrdersMergeStressTest_WithBidsQuantityReversedOrder, 
 		auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 		size_t acks_quantity_summary = 0;
 		for (auto &ask : asks)
-			acks_quantity_summary += ask.order->quantity;
+			acks_quantity_summary += ask.GetQuantity();
 
 		BOOST_TEST(summary_quantity == acks_quantity_summary);
 

@@ -16,7 +16,7 @@ struct MarketDataSnapshot
 		OrderData,
 		boost::multi_index::indexed_by<
 			boost::multi_index::ordered_non_unique<
-				boost::multi_index::tag<struct OrdersByPrice>,
+				boost::multi_index::tag<struct OrdersByPriceAsc>,
 				boost::multi_index::const_mem_fun<OrderData, price_t, &OrderData::GetPrice>,
 				std::less<price_t>
 			>
