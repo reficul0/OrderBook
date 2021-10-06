@@ -10,12 +10,13 @@ struct MarketDataSnapshot;
 
 struct OrderData
 {
+	OrderData() = default;
 	OrderData(order_id_t order_id, std::unique_ptr<Order> order) noexcept
-		: order_id(order_id)
+		: order_id(std::move(order_id))
 		, order(std::move(order))
 	{}
 	OrderData(OrderData &&other) noexcept
-		: order_id(other.order_id)
+		: order_id(std::move(other.order_id))
 		, order(std::move(other.order))
 	{
 	}
@@ -26,7 +27,7 @@ struct OrderData
 	{
 		if (this != &other)
 		{
-			this->order_id = other.order_id;
+			this->order_id = std::move(other.order_id);
 			this->order = std::move(other.order);
 		}
 		return *this;
@@ -67,15 +68,10 @@ public:
 		boost::multi_index::tag<struct OrdersById>,
 		boost::multi_index::member<OrderData, decltype(OrderData::order_id), &OrderData::order_id>
 	>;
-	using orders_by_type_hashed_non_unique_index_t = boost::multi_index::hashed_non_unique<
-		boost::multi_index::tag<struct OrdersByType>,
-		boost::multi_index::const_mem_fun<OrderData, decltype(std::declval<OrderData>().GetType()), &OrderData::GetType>
-	>;
 	using orders_book_t = boost::multi_index::multi_index_container<
 		OrderData,
 		boost::multi_index::indexed_by<
 			orders_by_id_hashed_unique_index_t,
-			orders_by_type_hashed_non_unique_index_t,
 			boost::multi_index::hashed_non_unique<
 				boost::multi_index::tag<struct OrdersByPriceAndType>,
 			    boost::multi_index::composite_key<
@@ -96,12 +92,12 @@ public:
 	 * \brief Отмена заявки
 	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет, то есть её отменили), то boost::none.
 	 */
-	boost::optional<OrderData> cancel(order_id_t);
+	boost::optional<OrderData> cancel(order_id_t const &);
 	/**
 	 * \brief Получение данных заявки
 	 * \return Данные заявки
 	 */
-	OrderData const& get_data(order_id_t) const;
+	OrderData const& get_data(order_id_t const &) const;
 	/**
 	 * \brief Получить срез данных, которые есть в стакане на момент вызова.
 	 * \return Срез.

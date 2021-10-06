@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderSnapshotGettingTest)
 	
 	auto const &snapshot = book.get_snapshot();
 
-	auto &asks = snapshot->orders[Order::Type::Ask];
+	auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 	BOOST_TEST(asks.size() == 1);
 	
 	auto &front_order = *asks.begin();
@@ -72,11 +72,11 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &asks = snapshot->orders[Order::Type::Ask];
+		auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 		// помещённый ask удовлетворён не полностью
 		BOOST_TEST(asks.size() == 1);
 
-		auto &bids = snapshot->orders[Order::Type::Bid];
+		auto &bids = snapshot->GetOrders()[Order::Type::Bid];
 		// а вот бида уже нет
 		BOOST_TEST(bids.empty());
 	}
@@ -92,11 +92,11 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &asks = snapshot->orders[Order::Type::Ask];
+		auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 		// все вски удовлетворены
 		BOOST_TEST(asks.empty());
 
-		auto &bids = snapshot->orders[Order::Type::Bid];
+		auto &bids = snapshot->GetOrders()[Order::Type::Bid];
 		// все биды удовлетворены
 		BOOST_TEST(bids.empty());
 	}
@@ -139,11 +139,11 @@ BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest, *boost::unit_test::timeout(1))
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &asks = snapshot->orders[Order::Type::Ask];
+		auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 		// помещённый ask удовлетворён полностью
 		BOOST_TEST(asks.empty());
 
-		auto &bids = snapshot->orders[Order::Type::Bid];
+		auto &bids = snapshot->GetOrders()[Order::Type::Bid];
 		// биды тоже все удовлетворены
 		BOOST_TEST(bids.empty());
 	}
@@ -345,10 +345,10 @@ BOOST_AUTO_TEST_CASE(ALotOfOrdersMergeStressTest, *boost::unit_test::timeout(10)
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &asks = snapshot->orders[Order::Type::Ask];
+		auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 		BOOST_TEST(asks.empty());
 
-		auto &bids = snapshot->orders[Order::Type::Bid];
+		auto &bids = snapshot->GetOrders()[Order::Type::Bid];
 		BOOST_TEST(bids.empty());
 	}
 }
@@ -396,14 +396,14 @@ BOOST_AUTO_TEST_CASE(ALotOfOrdersMergeStressTest_WithBidsQuantityReversedOrder, 
 	{
 		auto const &snapshot = book.get_snapshot();
 
-		auto &asks = snapshot->orders[Order::Type::Ask];
+		auto &asks = snapshot->GetOrders()[Order::Type::Ask];
 		size_t acks_quantity_summary = 0;
 		for (auto &ask : asks)
 			acks_quantity_summary += ask.order->quantity;
 
 		BOOST_TEST(summary_quantity == acks_quantity_summary);
 
-		auto &bids = snapshot->orders[Order::Type::Bid];
+		auto &bids = snapshot->GetOrders()[Order::Type::Bid];
 		BOOST_TEST(bids.empty());
 	}
 }

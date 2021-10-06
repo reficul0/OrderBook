@@ -22,23 +22,23 @@ struct MarketDataSnapshot
 			>
 		>
 	>;
-	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> orders{};
+
+private:
+	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> _orders{};
+public:
+	decltype(_orders) const& GetOrders() const
+	{
+		return _orders;
+	}
 };
 
 template<typename OrdersContainerT>
 inline void MarketDataSnapshot::add_orders(OrdersContainerT const &orders_container)
 {
-	auto &orders_by_type = orders_container.template get<OrdersByType>();
-	for (uint8_t order_type = 0; order_type < Order::Type::_EnumElementsCount; ++order_type)
+	for (auto const &order : orders_container)
 	{
-		auto const orders_iters_pair = orders_by_type.equal_range(order_type);
-		if (orders_iters_pair.second == orders_iters_pair.first)
-			return;
-		for (auto current_order = orders_iters_pair.first; current_order != orders_iters_pair.second; ++current_order)
-		{
-			auto order_copy = *current_order;
-			orders[order_type].emplace(std::move(order_copy));
-		}
+		auto order_copy = order;
+		_orders[order.GetType()].emplace(std::move(order_copy));
 	}
 }
 

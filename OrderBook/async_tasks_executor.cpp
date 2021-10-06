@@ -9,19 +9,18 @@ namespace tools
 			std::unique_lock<decltype(_executor_state)> executor_state_lock{_executor_state};
 
 			_service = std::make_unique<decltype(_service)::element_type>();
-			_strand = std::make_unique<decltype(_strand)::element_type>(*_service);
 			_work = std::make_unique<decltype(_work)::element_type>(*_service);
 
 			_execution_thread = decltype(_execution_thread){ 
 				boost::thread(
-					[](decltype(_strand) &strand)
+					[](decltype(_service) &service)
 					{
-						try { strand->get_io_service().run(); }
+						try { service->run(); }
 						catch (boost::thread_interrupted const &)
 						{
 						}
 					},
-					std::ref(_strand)
+					std::ref(_service)
 				)
 			};
 		}
@@ -41,10 +40,10 @@ namespace tools
 			_service.reset();
 		}
 
-		auto TasksExecutor::GetStrand() const
-			-> decltype(*_strand)
+		auto TasksExecutor::GetService() const
+			-> decltype(*_service)
 		{
-			return *_strand;
+			return *_service;
 		}
 	}
 }

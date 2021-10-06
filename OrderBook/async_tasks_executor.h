@@ -22,7 +22,6 @@ namespace tools
 			std::mutex _executor_state;
 
 			std::unique_ptr<boost::asio::io_service> _service;
-			std::unique_ptr<boost::asio::io_service::strand> _strand;
 			std::unique_ptr<boost::asio::io_service::work> _work;
 			boost::scoped_thread<boost::interrupt_and_join_if_joinable> _execution_thread;
 
@@ -33,7 +32,7 @@ namespace tools
 			void StartTasksExecution();
 			void StopTasksExecution();
 
-			decltype(*_strand) GetStrand() const;
+			decltype(*_service) GetService() const;
 		};
 	}
 } 
