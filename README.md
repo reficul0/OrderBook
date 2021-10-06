@@ -1,3 +1,6 @@
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f698efaf304c42718295d0742cf9fcc1)](https://www.codacy.com/gh/reficul0/OrderBook/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=reficul0/OrderBook&amp;utm_campaign=Badge_Grade)
+[![CodeFactor](https://www.codefactor.io/repository/github/reficul0/orderbook/badge)](https://www.codefactor.io/repository/github/reficul0/orderbook)
+<br>
 ![language](https://img.shields.io/badge/language-c++-blue.svg)
 ![c++](https://img.shields.io/badge/std-c++14-blue.svg)
 
