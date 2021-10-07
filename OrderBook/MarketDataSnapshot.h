@@ -7,11 +7,12 @@
 
 struct MarketDataSnapshot
 {
-	MarketDataSnapshot() = default;
+	template<typename OrdersPtrIterT>
+	void add_orders(OrdersPtrIterT orders_begin, OrdersPtrIterT orders_end);
 
-	template<typename OrdersContainerT>
-	void add_orders(OrdersContainerT const &orders);
-
+	template<typename OrdersPtrIterT>
+	static std::unique_ptr<MarketDataSnapshot> create(OrdersPtrIterT orders_begin, OrdersPtrIterT orders_end);
+	
 	using sorted_by_price_orders_t = boost::multi_index::multi_index_container<
 		OrderData,
 		boost::multi_index::indexed_by<
@@ -24,6 +25,8 @@ struct MarketDataSnapshot
 	>;
 
 private:
+	MarketDataSnapshot() noexcept = default;
+
 	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> _orders{};
 public:
 	decltype(_orders) const& GetOrders() const
@@ -32,14 +35,22 @@ public:
 	}
 };
 
-template<typename OrdersContainerT>
-inline void MarketDataSnapshot::add_orders(OrdersContainerT const &orders_container)
+template<typename OrdersPtrIterT>
+inline void MarketDataSnapshot::add_orders(OrdersPtrIterT orders_begin, OrdersPtrIterT orders_end)
 {
-	for (auto const &order : orders_container)
+	for (auto current_iter = orders_begin; current_iter != orders_end; ++current_iter)
 	{
-		auto order_copy = order;
-		_orders[order.GetType()].emplace(std::move(order_copy));
+		auto current_copy= **current_iter;
+		_orders[(*current_iter)->GetType()].emplace(std::move(current_copy));
 	}
+}
+
+template <typename OrdersPtrIterT>
+std::unique_ptr<MarketDataSnapshot> MarketDataSnapshot::create(OrdersPtrIterT orders_begin, OrdersPtrIterT orders_end)
+{
+	auto snapshot = std::unique_ptr<MarketDataSnapshot>(new MarketDataSnapshot());
+	snapshot->add_orders(orders_begin, orders_end);
+	return std::move(snapshot);
 }
 
 #endif
