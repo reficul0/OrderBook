@@ -3,6 +3,7 @@
 #ifndef ORDER_BOOK_H
 #define ORDER_BOOK_H
 
+#include "async_tasks_executor.h"
 #include "Order.h"
 
 struct MarketDataSnapshot;
