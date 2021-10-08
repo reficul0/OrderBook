@@ -25,9 +25,7 @@ struct MarketDataSnapshot
 	>;
 
 private:
-	MarketDataSnapshot() noexcept
-	{
-	}
+	MarketDataSnapshot() noexcept = default;
 
 	std::array<sorted_by_price_orders_t, Order::Type::_EnumElementsCount> _orders{};
 public:
