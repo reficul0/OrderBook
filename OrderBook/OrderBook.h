@@ -15,6 +15,17 @@ struct OrderData
 		: order_id(std::move(order_id))
 		, _order(std::move(order))
 	{}
+
+
+	OrderData(OrderData const& other)
+		noexcept(noexcept(
+			std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
+			))
+		: order_id(other.order_id)
+		, _order(std::make_unique<Order>(other._order->type, other._order->price, other._order->quantity))
+	{
+	}
+	
 	OrderData(OrderData &&other) noexcept
 		: order_id(std::move(other.order_id))
 		, _order(std::move(other._order))
@@ -49,16 +60,6 @@ struct OrderData
 	
 	order_id_t order_id;
 private:
-	// Разрешаем копировать данные заявки только для создания снапшота
-	friend struct MarketDataSnapshot;
-	OrderData(OrderData const& other)
-		noexcept(noexcept(
-				std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
-			))
-		: order_id(other.order_id)
-		, _order(std::make_unique<Order>(other._order->type, other._order->price, other._order->quantity))
-	{
-	}
 
 	std::unique_ptr<Order> _order;
 };
@@ -103,7 +104,7 @@ public:
 	 * \brief Получение данных заявки
 	 * \return Данные заявки
 	 */
-	OrderData const& get_data(order_id_t const &) const;
+	OrderData get_data(order_id_t const &) const;
 	/**
 	 * \brief Получить срез данных, которые есть в стакане на момент вызова.
 	 * \return Срез.

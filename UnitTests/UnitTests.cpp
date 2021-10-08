@@ -10,18 +10,81 @@
 #include "OrderBook.h"
 #include "MarketDataSnapshot.h"
 
-BOOST_AUTO_TEST_SUITE(OrderBookEssentialOperationsTesets)
-
-void post_and_wait_for_merge(OrderBook &book, std::unique_ptr<Order> order, boost::chrono::milliseconds wait_for_merge_timeout = boost::chrono::milliseconds(100))
+class OrderBookTestWrapper : boost::noncopyable
 {
-	book.post(std::move(order));
-	// даём время на мёрж 
-	boost::this_thread::sleep_for(wait_for_merge_timeout);
-}
+public:
+	/**
+	 * \brief Постановка заявок
+	 * \return id заявки
+	 */
+	order_id_t post(std::unique_ptr<Order> order)
+	{
+		auto order_id = _book.post(std::move(order));
+		// даём время на мёрж 
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+		return order_id;
+	}
+	/**
+	 * \brief Отмена заявки
+	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет, то есть её отменили), то boost::none.
+	 */
+	boost::optional<OrderData> cancel(order_id_t const &id)
+	{
+		return _book.cancel(id);
+	}
+	/**
+	 * \brief Получение данных заявки
+	 * \return Данные заявки
+	 */
+	OrderData get_data(order_id_t const &id) const
+	{
+		return _book.get_data(id);
+	}
+	/**
+	 * \brief Получить срез данных, которые есть в стакане на момент вызова.
+	 * \return Срез.
+	 */
+	std::unique_ptr<MarketDataSnapshot> get_snapshot() const
+	{
+		return _book.get_snapshot();
+	}
 
-BOOST_AUTO_TEST_CASE(SingleOrderPostingAndCancellingTest)
+	OrderBookTestWrapper() = default;
+	~OrderBookTestWrapper() = default;
+private:
+	OrderBook _book;
+};
+
+BOOST_AUTO_TEST_SUITE(OrderBookSpecialCases)
+
+BOOST_AUTO_TEST_CASE(EmptyBookSnapshotGetting)
 {
 	OrderBook book;
+	auto const &snapshot = book.get_snapshot();
+	BOOST_TEST(snapshot->GetOrders()[Order::Type::Ask].empty());
+	BOOST_TEST(snapshot->GetOrders()[Order::Type::Bid].empty());
+}
+
+BOOST_AUTO_TEST_CASE(EmptyBookOrderDataGetting)
+{
+	OrderBook book;
+	BOOST_CHECK_THROW(book.get_data(0), std::exception);
+}
+
+BOOST_AUTO_TEST_CASE(EmptyBookOrderCancelling)
+{
+	OrderBook book;
+	auto order_data = book.cancel(0);
+	BOOST_TEST((false == (bool)order_data));
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(OrderBookEssentialOperations)
+
+BOOST_AUTO_TEST_CASE(OrderPostingAndCancelling)
+{
+	OrderBookTestWrapper book;
 
 	auto order_id = book.post(std::make_unique<Order>(Order::Type::Ask, 4, 300));
 	BOOST_TEST_PASSPOINT();
@@ -38,9 +101,9 @@ BOOST_AUTO_TEST_CASE(SingleOrderPostingAndCancellingTest)
 	BOOST_CHECK_THROW(book.get_data(order_id), std::exception);
 }
 
-BOOST_AUTO_TEST_CASE(SingleOrderSnapshotGettingTest)
+BOOST_AUTO_TEST_CASE(SignleOrderSnapshotGetting)
 {
-	OrderBook book;
+	OrderBookTestWrapper book;
 
 	auto order_id = book.post(std::make_unique<Order>(Order::Type::Ask, 4, 300));
 	BOOST_TEST_PASSPOINT();
@@ -57,16 +120,16 @@ BOOST_AUTO_TEST_CASE(SingleOrderSnapshotGettingTest)
 	BOOST_TEST(front_order.GetQuantity() == 300);
 }
 
-BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
+BOOST_AUTO_TEST_CASE(SignleOrderMerging, *boost::unit_test::timeout(1))
 {
-	OrderBook book;
+	OrderBookTestWrapper book;
 
 	auto constexpr summary_quantity = 300;
 	
 	auto const ask_order_id = book.post(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
 	BOOST_TEST_PASSPOINT();
 	
-	post_and_wait_for_merge(book, std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - 1));
+	book.post(std::make_unique<Order>(Order::Type::Bid, 4, summary_quantity - 1));
 	BOOST_TEST_PASSPOINT();
 	
 	{
@@ -85,7 +148,7 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
 	// аск всё ещё не удовлетворён
 	BOOST_TEST(order_data.GetQuantity() == 1);
 
-	post_and_wait_for_merge(book, std::make_unique<Order>(Order::Type::Bid, 4, 1));
+	book.post(std::make_unique<Order>(Order::Type::Bid, 4, 1));
 	// аск удовлетворён
 	BOOST_CHECK_THROW(book.get_data(ask_order_id), std::exception);
 
@@ -102,9 +165,9 @@ BOOST_AUTO_TEST_CASE(SingleOrderMergingTest, *boost::unit_test::timeout(1))
 	}
 }
 
-BOOST_AUTO_TEST_CASE(TopPriorityOrderMergeTest, *boost::unit_test::timeout(1))
+BOOST_AUTO_TEST_CASE(TopPriorityOrderMerging, *boost::unit_test::timeout(1))
 {
-	OrderBook book;
+	OrderBookTestWrapper book;
 
 	auto constexpr summary_quantity = 300;
 	auto constexpr second_order_quantity = 1;
@@ -115,16 +178,16 @@ BOOST_AUTO_TEST_CASE(TopPriorityOrderMergeTest, *boost::unit_test::timeout(1))
 	auto const less_priority_order_id = book.post(std::make_unique<Order>(Order::Type::Bid, 4, second_order_quantity));
 	BOOST_TEST_PASSPOINT();
 
-	post_and_wait_for_merge(book, std::make_unique<Order>(Order::Type::Ask, 4, top_priority_order_quantity));
+	book.post(std::make_unique<Order>(Order::Type::Ask, 4, top_priority_order_quantity));
 	// Должна быть слита самая приоритетная заявка ..
 	BOOST_CHECK_THROW(book.get_data(top_priority_order_id), std::exception);
 	// .. а менее приоритетная не должна.
 	BOOST_CHECK_NO_THROW(book.get_data(less_priority_order_id));
 }
 
-BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest, *boost::unit_test::timeout(1))
+BOOST_AUTO_TEST_CASE(TwoInARowOrdersMerging, *boost::unit_test::timeout(1))
 {
-	OrderBook book;
+	OrderBookTestWrapper book;
 
 	auto constexpr summary_quantity = 300;
 	auto constexpr second_order_quantity = 1;
@@ -133,7 +196,7 @@ BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest, *boost::unit_test::timeout(1))
 	BOOST_TEST_PASSPOINT();
 	book.post(std::make_unique<Order>(Order::Type::Bid, 4, second_order_quantity));
 	BOOST_TEST_PASSPOINT();
-	post_and_wait_for_merge(book, std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
+	book.post(std::make_unique<Order>(Order::Type::Ask, 4, summary_quantity));
 	BOOST_TEST_PASSPOINT();
 
 	{
@@ -149,11 +212,153 @@ BOOST_AUTO_TEST_CASE(TwoInARowOrdersMergingTest, *boost::unit_test::timeout(1))
 	}
 }
 
+BOOST_AUTO_TEST_CASE(OrderDataDoNotChangeWhenOrderChanged, *boost::unit_test::timeout(1))
+{
+	/* get_data должен возвращать копию данных, которая формируется в контексте критической секции, что обеспечивает защиту от гонок.
+	 * если get_data возвращает ссылку(изменения в контейнере отображаются в возвращённом обхъекте),
+	 * то возникает вероятность гонок, которую пользователь не сможет предотвратить(поскольку все инструменты синхронизации спрятаны от него).
+	 */
+	OrderBookTestWrapper book;
+
+	auto constexpr bid_quantity = 300;
+	auto constexpr ask_quantity = 1;
+
+	auto bid_id = book.post(std::make_unique<Order>(Order::Type::Bid, 4, bid_quantity));
+	BOOST_TEST_PASSPOINT();
+
+	auto const &bid_data = book.get_data(bid_id);
+	BOOST_TEST_PASSPOINT();
+
+	BOOST_TEST(bid_data.GetQuantity() == bid_quantity);
+
+	book.post(std::make_unique<Order>(Order::Type::Ask, 4, ask_quantity));
+	BOOST_TEST_PASSPOINT();
+
+	BOOST_TEST(bid_data.GetQuantity() == bid_quantity);
+}
+
+BOOST_AUTO_TEST_CASE(SnapshotDataDoNotChangeWhenOrderChanged, *boost::unit_test::timeout(1))
+{
+	OrderBookTestWrapper book;
+
+	auto constexpr bid_quantity = 300;
+	auto constexpr ask_quantity = 1;
+
+	auto bid_id = book.post(std::make_unique<Order>(Order::Type::Bid, 4, bid_quantity));
+	BOOST_TEST_PASSPOINT();
+
+	auto snapshot = book.get_snapshot();
+	auto const &snapshot_bid_orders = snapshot->GetOrders()[Order::Type::Bid];
+	auto const bid_data_iter = std::find_if(snapshot_bid_orders.begin(), snapshot_bid_orders.end(),
+		[bid_id](OrderData const &order)
+		{
+			return order.order_id == bid_id;
+		}
+	);
+
+	BOOST_TEST_PASSPOINT();
+
+	BOOST_TEST(bid_data_iter->GetQuantity() == bid_quantity);
+
+	book.post(std::make_unique<Order>(Order::Type::Ask, 4, ask_quantity));
+	BOOST_TEST_PASSPOINT();
+
+	BOOST_TEST(bid_data_iter->GetQuantity() == bid_quantity);
+}
+
+BOOST_AUTO_TEST_CASE(SnapshotDataAreInAscPriceOrder, *boost::unit_test::timeout(1))
+{
+	OrderBookTestWrapper book;
+
+	book.post(std::make_unique<Order>(Order::Type::Bid, 5, 300));
+	book.post(std::make_unique<Order>(Order::Type::Bid, 1, 300));
+	book.post(std::make_unique<Order>(Order::Type::Bid, 10, 300));
+	BOOST_TEST_PASSPOINT();
+
+	auto snapshot = book.get_snapshot();
+	auto const &snapshot_bid_orders = snapshot->GetOrders()[Order::Type::Bid];
+	BOOST_TEST(
+		std::is_sorted(
+			snapshot_bid_orders.begin(),
+			snapshot_bid_orders.end(),
+			[comparator = std::less<price_t>()](OrderData const &lhs, OrderData const &rhs)
+			{
+				return comparator(lhs.GetPrice(), rhs.GetPrice());
+			}
+		)
+	);
+	BOOST_TEST_PASSPOINT();
+
+	book.post(std::make_unique<Order>(Order::Type::Ask, 3, 300));
+	book.post(std::make_unique<Order>(Order::Type::Ask, 20, 300));
+	book.post(std::make_unique<Order>(Order::Type::Ask, 10, 300));
+	BOOST_TEST_PASSPOINT();
+
+	auto const &snapshot_ask_orders = snapshot->GetOrders()[Order::Type::Ask];
+	BOOST_TEST(
+		std::is_sorted(
+			snapshot_ask_orders.begin(),
+			snapshot_ask_orders.end(),
+			[comparator = std::less<price_t>()](OrderData const &lhs, OrderData const &rhs)
+	{
+		return comparator(lhs.GetPrice(), rhs.GetPrice());
+	}
+	)
+	);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(OperationsOnSatisfactedOrders)
+
+BOOST_AUTO_TEST_CASE(CancellingDataOfSatisfactedOrder, *boost::unit_test::timeout(1))
+{
+	OrderBookTestWrapper book;
+
+	auto ask_id = book.post(std::make_unique<Order>(Order::Type::Ask, 4, 300));
+	BOOST_TEST_PASSPOINT();
+	auto bid_id = book.post(std::make_unique<Order>(Order::Type::Bid, 4, 300));
+	BOOST_TEST_PASSPOINT();
+
+	auto cancelled_ask = book.cancel(ask_id);
+	BOOST_TEST((false == cancelled_ask.is_initialized()));
+
+	auto cancelled_bid = book.cancel(ask_id);
+	BOOST_TEST((false == cancelled_bid.is_initialized()));
+}
+
+BOOST_AUTO_TEST_CASE(GettingDataOfSatisfactedOrder, *boost::unit_test::timeout(1))
+{
+	OrderBookTestWrapper book;
+
+	auto ask_id = book.post(std::make_unique<Order>(Order::Type::Ask, 4, 300));
+	BOOST_TEST_PASSPOINT();
+	auto bid_id = book.post(std::make_unique<Order>(Order::Type::Bid, 4, 300));
+	BOOST_TEST_PASSPOINT();
+
+	BOOST_CHECK_THROW(book.get_data(ask_id), std::exception);
+	BOOST_CHECK_THROW(book.get_data(bid_id), std::exception);
+}
+
+BOOST_AUTO_TEST_CASE(LookupDataOfSatisfactedOrderInSnapsot, *boost::unit_test::timeout(1))
+{
+	OrderBookTestWrapper book;
+
+	auto order_id = book.post(std::make_unique<Order>(Order::Type::Ask, 4, 300));
+	BOOST_TEST_PASSPOINT();
+	book.post(std::make_unique<Order>(Order::Type::Bid, 4, 300));
+	BOOST_TEST_PASSPOINT();
+
+	auto snapshot = book.get_snapshot();
+	BOOST_TEST(snapshot->GetOrders()[Order::Type::Ask].empty());
+	BOOST_TEST(snapshot->GetOrders()[Order::Type::Bid].empty());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 #ifdef IS_CI_BUILD
 
-BOOST_AUTO_TEST_SUITE(OrderBookOperationsDurationTesets)
+BOOST_AUTO_TEST_SUITE(OrderBookOperationsDuration)
 
 /* Тесты выше и так не быстрые, но те, что ниже занимают ещё больше времени. Прогонять их каждый раз нет смысла, ибо их долго ждать.
  * То есть, если тесты долгие, то люди рано или поздно устанут их ждать и просто выключат.

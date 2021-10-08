@@ -26,12 +26,15 @@ namespace details
 		}
 
 		template<typename OrdersMultiIndexContainerT>
-		boost::optional<OrderData const&> get_data(order_id_t const &id, boost::shared_mutex &container_mutex, OrdersMultiIndexContainerT &container)
+		boost::optional<OrderData> get_data(order_id_t const &id, boost::shared_mutex &container_mutex, OrdersMultiIndexContainerT &container)
 		{
 			boost::shared_lock<boost::shared_mutex> read_lock(container_mutex);
 			auto& orders_by_id = container.template get<OrdersById>();
 			auto const order_iter = orders_by_id.find(id);
 			if (order_iter != orders_by_id.end())
+				/* Копируем, поскольку у пользователя нет доступа к синхронизации данных.
+				 * И мы либо даём ему копию, либо, если давать по ссылке, то всегда будет вероятность гонки.
+				 */
 				return *order_iter;
 
 			return boost::none;
@@ -90,15 +93,15 @@ public:
 		return boost::none;
 	}
 
-	OrderData const& get_data(order_id_t const &id) const
+	OrderData get_data(order_id_t const &id) const
 	{
 		if (auto const book_order = details::get_data(id, _book.mutex, _book.container))
 			if (_is_order_satisfied(*book_order) == false)
-				return *book_order;
+				return std::move(*book_order);
 
 		if (auto const merging_order = details::get_data(id, _merging.mutex, _merging.container))
 			if (_is_order_satisfied(*merging_order) == false)
-				return *merging_order;
+				return std::move(*merging_order);
 
 		throw std::logic_error("There is no order with same id");
 	}
@@ -279,7 +282,7 @@ boost::optional<OrderData> OrderBook::cancel(order_id_t const &id)
 	return _impl->cancel(id);
 }
 
-OrderData const& OrderBook::get_data(order_id_t const &id) const
+OrderData OrderBook::get_data(order_id_t const &id) const
 {
 	return _impl->get_data(id);
 }
