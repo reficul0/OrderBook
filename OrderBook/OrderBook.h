@@ -10,26 +10,24 @@ struct MarketDataSnapshot;
 
 struct OrderData
 {
-	using ptr_t = std::shared_ptr<OrderData>;
-	
 	OrderData() = default;
 	OrderData(order_id_t order_id, std::unique_ptr<Order> order) noexcept
-		: order_id(order_id)
+		: order_id(std::move(order_id))
 		, _order(std::move(order))
 	{}
 	OrderData(OrderData &&other) noexcept
-		: order_id(other.order_id)
+		: order_id(std::move(other.order_id))
 		, _order(std::move(other._order))
 	{
 	}
 	OrderData& operator=(OrderData && other)
 		noexcept(noexcept(
 			std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
-		))
+			))
 	{
 		if (this != &other)
 		{
-			this->order_id = other.order_id;
+			this->order_id = std::move(other.order_id);
 			this->_order = std::move(other._order);
 		}
 		return *this;
@@ -55,8 +53,8 @@ private:
 	friend struct MarketDataSnapshot;
 	OrderData(OrderData const& other)
 		noexcept(noexcept(
-			std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
-		))
+				std::make_unique<Order>(std::declval<Order::Type>(), std::declval<price_t>(), std::declval<quantity_t>())
+			))
 		: order_id(other.order_id)
 		, _order(std::make_unique<Order>(other._order->type, other._order->price, other._order->quantity))
 	{
@@ -77,7 +75,7 @@ public:
 		boost::multi_index::member<OrderData, decltype(OrderData::order_id), &OrderData::order_id>
 	>;
 	using orders_book_t = boost::multi_index::multi_index_container<
-		OrderData::ptr_t,
+		OrderData,
 		boost::multi_index::indexed_by<
 			orders_by_id_hashed_unique_index_t,
 			boost::multi_index::hashed_non_unique<
@@ -98,14 +96,14 @@ public:
 	order_id_t post(std::unique_ptr<Order>);
 	/**
 	 * \brief Отмена заявки
-	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет, то есть её отменили), то пустой указатель.
+	 * \return Данные отменённой заявки. Если такой заявки не было(либо уже нет, то есть её отменили), то boost::none.
 	 */
-	OrderData::ptr_t cancel(order_id_t);
+	boost::optional<OrderData> cancel(order_id_t const &);
 	/**
 	 * \brief Получение данных заявки
 	 * \return Данные заявки
 	 */
-	OrderData::ptr_t const& get_data(order_id_t) const;
+	OrderData const& get_data(order_id_t const &) const;
 	/**
 	 * \brief Получить срез данных, которые есть в стакане на момент вызова.
 	 * \return Срез.

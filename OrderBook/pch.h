@@ -39,4 +39,13 @@
 #include <boost/multi_index/composite_key.hpp>
 #include <boost/optional/optional.hpp>
 
+#include <boost/thread/synchronized_value.hpp>
+#include <boost/thread/shared_mutex.hpp>
+
+#include <boost/multiprecision/cpp_int.hpp>
+
+#include <boost/thread/future.hpp>
+
+#include "async_tasks_executor.h"
+
 #endif //PCH_H
