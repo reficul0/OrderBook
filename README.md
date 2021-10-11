@@ -17,7 +17,7 @@ Functionality:
 ## Requirements
 
 * [Required] - [Boost (1.64 or newer)](http://www.boost.org/).
-* [Required] - rt(Linux only).
+* [Required] - pthread(Linux only).
 
 ## System Compatibility
 
