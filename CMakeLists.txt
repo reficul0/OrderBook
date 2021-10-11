@@ -2,6 +2,8 @@
 
 project(OrderBookProject)
 
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 14)
 set(CXX_STANDARD_REQUIRED TRUE)
 

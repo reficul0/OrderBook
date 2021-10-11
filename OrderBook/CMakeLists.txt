@@ -20,3 +20,9 @@ target_link_libraries(${PROJECT_NAME} boost_regex boost_system boost_filesystem 
 target_compile_definitions(${PROJECT_NAME} 
     PRIVATE NOMINMAX
 )
+if(UNIX)
+	set(CMAKE_C_FLAGS " -fpermissive")
+	set(CMAKE_CXX_FLAGS " -fpermissive")
+	find_library(pthread REQUIRED)
+	target_link_libraries(${PROJECT_NAME} pthread)
+endif()
