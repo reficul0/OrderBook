@@ -19,7 +19,7 @@ Functionality:
 * [Required] - [Boost (1.64 or newer)](http://www.boost.org/).
 * [Required] - pthread(Linux only).
 
-### Сборка на Windows
+### Windows build
 
 ```shell
 - git clone git@github.com:reficul0/AlgorithmPractice.git
@@ -27,7 +27,7 @@ Functionality:
 - cmake -A %platform% -G "Visual Studio 15 2017" ..
 - cmake --build .
 ```
-### Сборка на Linux
+### Linux build
 
 ```bash
 $ git clone git@github.com:reficul0/AlgorithmPractice.git
