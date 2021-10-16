@@ -12,7 +12,7 @@ Functionality:
 * Cancellation of order by its id.
 * Getting data of order by its id.
 * Orders merging.
-* Getting of market data snapshot. Order data are aggregated and sorted in sacending order.
+* Getting of market data snapshot. Order data are aggregated and sorted in ascending order.
 
 ## Requirements
 
