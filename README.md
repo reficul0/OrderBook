@@ -22,7 +22,7 @@ Functionality:
 ### Windows build
 
 ```shell
-- git clone git@github.com:reficul0/AlgorithmPractice.git
+- git clone git@github.com:reficul0/OrderBook.git
 - mkdir build && cd build
 - cmake -A %platform% -G "Visual Studio 15 2017" ..
 - cmake --build .
@@ -30,7 +30,7 @@ Functionality:
 ### Linux build
 
 ```bash
-$ git clone git@github.com:reficul0/AlgorithmPractice.git
+$ git clone git@github.com:reficul0/OrderBook.git
 $ mkdir build && cd build
 $ cmake ..
 $ cmake --build .
